@@ -751,16 +751,16 @@ function VideoStudioContent() {
           </div>
 
           {/* Right Panel: Preview / Result (32%) */}
-          <div className="lg:w-[32%] max-h-[calc(100vh-120px)] overflow-hidden">
-            <div className="sticky top-6 max-h-[calc(100vh-140px)]">
-              <div className="bg-[#131825] rounded-xl border border-[#2A3050] overflow-hidden max-h-[calc(100vh-180px)] flex flex-col">
+          <div className="lg:w-[32%]">
+            <div className="sticky top-6">
+              <div className="bg-[#131825] rounded-xl border border-[#2A3050] h-[600px] flex flex-col">
                 <div className="px-5 py-4 border-b border-[#2A3050]">
                   <h2 className="text-sm font-semibold text-[#E2E8F0]">
                     {processingState === "success" ? "Result" : "Preview"}
                   </h2>
                 </div>
 
-                <div className="p-5 flex-1 overflow-y-auto">
+                <div className="p-5 flex-1">
                   {/* Idle state */}
                   {processingState === "idle" && !videoPreviewUrl && (
                     <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center text-[#8892A8]">
