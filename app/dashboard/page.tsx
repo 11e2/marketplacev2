@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
 import {
   DollarSign,
@@ -9,6 +10,7 @@ import {
   UserCheck,
   ExternalLink,
 } from "lucide-react"
+import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ChannelChip, StatusPill } from "@/components/channel-chip"
 import { brandStats, spendByChannel, activeCampaigns, recentSubmissions } from "@/lib/data"
@@ -87,12 +89,15 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-bold text-[#E2E8F0]">Brand Dashboard</h1>
-            <p className="text-sm text-[#8892A8]">Last 30 days · April 2026</p>
+            <p className="text-sm text-[#8892A8]">Last 30 days - April 2026</p>
           </div>
-          <button className="bg-[#FF6B35] hover:bg-[#e55a25] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
+          <Link
+            href="/campaign-builder"
+            className="bg-[#FF6B35] hover:bg-[#e55a25] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2"
+          >
             <Layers size={14} />
             New Campaign
-          </button>
+          </Link>
         </div>
 
         {/* Top stats */}
@@ -151,13 +156,14 @@ export default function DashboardPage() {
           <div className="bg-[#131825] border border-[#2A3050] rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-[#E2E8F0]">Active Campaigns</h2>
-              <button className="text-xs text-[#6C5CE7] hover:underline">View All</button>
+              <button onClick={() => toast.info("Campaign list coming soon")} className="text-xs text-[#6C5CE7] hover:underline">View All</button>
             </div>
             <div className="space-y-3">
               {activeCampaigns.map((c) => (
-                <div
+                <button
                   key={c.name}
-                  className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3 flex items-center gap-3"
+                  onClick={() => toast.info(`Campaign: ${c.name}`)}
+                  className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3 flex items-center gap-3 hover:border-[#6C5CE7]/40 transition-colors text-left"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#E2E8F0] truncate">{c.name}</p>
@@ -178,7 +184,7 @@ export default function DashboardPage() {
                       </span>
                     )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -188,7 +194,7 @@ export default function DashboardPage() {
         <div className="bg-[#131825] border border-[#2A3050] rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3050]">
             <h2 className="text-sm font-bold text-[#E2E8F0]">Recent Submissions</h2>
-            <button className="text-xs text-[#6C5CE7] hover:underline flex items-center gap-1">
+            <button onClick={() => toast.info("Full submissions list coming soon")} className="text-xs text-[#6C5CE7] hover:underline flex items-center gap-1">
               View All <ExternalLink size={11} />
             </button>
           </div>
@@ -233,11 +239,17 @@ export default function DashboardPage() {
                     <td className="px-5 py-3 font-mono text-[#E2E8F0]">{row.reach}</td>
                     <td className="px-5 py-3">
                       {row.status === "In Review" ? (
-                        <button className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                        <button
+                          onClick={() => toast.info(`Reviewing submission from ${row.creator}`)}
+                          className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                        >
                           Review
                         </button>
                       ) : (
-                        <button className="border border-[#2A3050] hover:bg-[#1A2035] text-[#E2E8F0] font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                        <button
+                          onClick={() => toast.info(`Viewing submission from ${row.creator}`)}
+                          className="border border-[#2A3050] hover:bg-[#1A2035] text-[#E2E8F0] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                        >
                           View
                         </button>
                       )}

@@ -1,10 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Search, Filter, ChevronDown } from "lucide-react"
+import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ChannelChip } from "@/components/channel-chip"
 import { campaigns, trendingChannels, matchScores } from "@/lib/data"
+import type { Campaign } from "@/lib/types"
 
 const filterPills = ["All", "TikTok", "YouTube", "Twitter/X", "Discord", "Newsletter", "Podcast", "Twitch", "Instagram", "More"]
 
@@ -22,6 +25,20 @@ export default function MarketplacePage() {
       c.channels.some((ch) => ch.toLowerCase().includes(activeFilter.toLowerCase()))
     return matchSearch && matchFilter
   })
+
+  const handleTrendingClick = (channelName: string) => {
+    const channel = channelName.split(" ")[0]
+    setActiveFilter(channel === "Podcast" ? "Podcast" : channel)
+  }
+
+  const handleMatchClick = (campaignName: string) => {
+    const el = document.getElementById(`campaign-${campaignName}`)
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" })
+      el.classList.add("ring-2", "ring-[#6C5CE7]")
+      setTimeout(() => el.classList.remove("ring-2", "ring-[#6C5CE7]"), 2000)
+    }
+  }
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
@@ -41,7 +58,10 @@ export default function MarketplacePage() {
                 className="w-full bg-[#131825] border border-[#2A3050] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[#E2E8F0] placeholder-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
               />
             </div>
-            <button className="flex items-center gap-2 bg-[#131825] border border-[#2A3050] rounded-xl px-4 py-2.5 text-sm text-[#8892A8] hover:border-[#6C5CE7] transition-colors">
+            <button
+              onClick={() => toast.info("Filters coming soon")}
+              className="flex items-center gap-2 bg-[#131825] border border-[#2A3050] rounded-xl px-4 py-2.5 text-sm text-[#8892A8] hover:border-[#6C5CE7] transition-colors"
+            >
               <Filter size={14} />
               Filters
               <ChevronDown size={14} />
@@ -97,10 +117,14 @@ export default function MarketplacePage() {
               <h2 className="text-sm font-bold text-[#E2E8F0] mb-3">Trending Channels</h2>
               <div className="space-y-2">
                 {trendingChannels.map((ch) => (
-                  <div key={ch.name} className="bg-[#131825] border border-[#2A3050] rounded-xl p-3 flex items-center justify-between">
+                  <button
+                    key={ch.name}
+                    onClick={() => handleTrendingClick(ch.name)}
+                    className="w-full bg-[#131825] border border-[#2A3050] rounded-xl p-3 flex items-center justify-between hover:border-[#6C5CE7]/40 transition-colors text-left"
+                  >
                     <span className="text-sm font-medium text-[#E2E8F0]">{ch.name}</span>
                     <span className="text-xs font-bold font-mono" style={{ color: "#00B894" }}>{ch.growth}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -110,7 +134,11 @@ export default function MarketplacePage() {
               <h2 className="text-sm font-bold text-[#E2E8F0] mb-3">Your Match Score</h2>
               <div className="space-y-3">
                 {matchScores.map((m) => (
-                  <div key={m.campaign} className="bg-[#131825] border border-[#2A3050] rounded-xl p-3 flex items-center gap-3">
+                  <button
+                    key={m.campaign}
+                    onClick={() => handleMatchClick(m.campaign)}
+                    className="w-full bg-[#131825] border border-[#2A3050] rounded-xl p-3 flex items-center gap-3 hover:border-[#6C5CE7]/40 transition-colors text-left"
+                  >
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm font-bold font-mono border-2"
                       style={{ borderColor: m.color, color: m.color }}
@@ -118,7 +146,7 @@ export default function MarketplacePage() {
                       {m.score}
                     </div>
                     <p className="text-xs text-[#8892A8] leading-snug">{m.campaign}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -147,49 +175,51 @@ export default function MarketplacePage() {
   )
 }
 
-function CampaignCard({ campaign }: { campaign: (typeof campaigns)[0] }) {
+function CampaignCard({ campaign }: { campaign: Campaign }) {
   return (
-    <div className="bg-[#131825] border border-[#2A3050] rounded-xl overflow-hidden hover:border-[#6C5CE7]/40 hover:shadow-lg hover:shadow-black/30 transition-all group cursor-pointer">
+    <div id={`campaign-${campaign.title.split(":")[0].trim()}`} className="bg-[#131825] border border-[#2A3050] rounded-xl overflow-hidden hover:border-[#6C5CE7]/40 hover:shadow-lg hover:shadow-black/30 transition-all group">
       {/* Accent bar */}
       <div className="h-1" style={{ backgroundColor: campaign.accentColor }} />
 
       <div className="p-5">
-        {/* Brand header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-              style={{ backgroundColor: campaign.brandColor }}
-            >
-              {campaign.brandInitial}
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-[#E2E8F0]">{campaign.brand}</span>
-                {campaign.verified && (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#00B89420] text-[#00B894]">
-                    Verified
-                  </span>
-                )}
+        <Link href={`/campaign/${campaign.id}`} className="block cursor-pointer">
+          {/* Brand header */}
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                style={{ backgroundColor: campaign.brandColor }}
+              >
+                {campaign.brandInitial}
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-[#E2E8F0]">{campaign.brand}</span>
+                  {campaign.verified && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#00B89420] text-[#00B894]">
+                      Verified
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
+            {/* Rate badge */}
+            <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-[#00B89420] text-[#00B894] shrink-0">
+              {campaign.rate}
+            </span>
           </div>
-          {/* Rate badge */}
-          <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-[#00B89420] text-[#00B894] shrink-0">
-            {campaign.rate}
-          </span>
-        </div>
 
-        {/* Title & description */}
-        <h3 className="text-sm font-bold text-[#E2E8F0] mb-1.5">{campaign.title}</h3>
-        <p className="text-xs text-[#8892A8] leading-relaxed line-clamp-2 mb-3">{campaign.description}</p>
+          {/* Title & description */}
+          <h3 className="text-sm font-bold text-[#E2E8F0] mb-1.5">{campaign.title}</h3>
+          <p className="text-xs text-[#8892A8] leading-relaxed line-clamp-2 mb-3">{campaign.description}</p>
 
-        {/* Channel chips */}
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {campaign.channels.map((ch) => (
-            <ChannelChip key={ch} channel={ch} />
-          ))}
-        </div>
+          {/* Channel chips */}
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {campaign.channels.map((ch) => (
+              <ChannelChip key={ch} channel={ch} />
+            ))}
+          </div>
+        </Link>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-[#2A3050]">
@@ -197,7 +227,10 @@ function CampaignCard({ campaign }: { campaign: (typeof campaigns)[0] }) {
             <span>Budget: <span className="font-mono font-semibold text-[#E2E8F0]">{campaign.budget}</span></span>
             <span>{campaign.spots} spots left</span>
           </div>
-          <button className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors">
+          <button
+            onClick={() => toast.success("Application submitted!")}
+            className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
+          >
             Apply
           </button>
         </div>
