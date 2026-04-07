@@ -5,12 +5,6 @@ import { join } from "path"
 import { execFile } from "child_process"
 import { randomUUID } from "crypto"
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
-
 // Next.js App Router: allow up to 500MB uploads
 export const maxDuration = 120
 

@@ -119,14 +119,16 @@ export default function VideoStudioPage() {
       })
 
       if (!response.ok) {
-        let errorText: string
+        // Clone response before reading to avoid "body stream already read" error
+        const text = await response.text()
+        let errorText = "Processing failed"
         try {
-          const json = await response.json()
-          errorText = json.error || "Processing failed"
+          const json = JSON.parse(text)
+          errorText = json.error || errorText
         } catch {
-          errorText = await response.text()
+          errorText = text || errorText
         }
-        throw new Error(errorText || "Processing failed")
+        throw new Error(errorText)
       }
 
       const blob = await response.blob()
