@@ -67,7 +67,7 @@ export default function LandingPage() {
           <Link href="/marketplace" className="hover:text-white transition-colors">Marketplace</Link>
           <Link href="/dashboard" className="hover:text-white transition-colors">For Brands</Link>
           <Link href="/earnings" className="hover:text-white transition-colors">For Creators</Link>
-          <Link href="/campaign-builder" className="hover:text-white transition-colors">Pricing</Link>
+          <Link href="/pitch-deck" className="hover:text-white transition-colors">Investors</Link>
         </nav>
         <div className="flex items-center gap-3">
           <Link href="/marketplace" className="text-sm text-[#8892A8] hover:text-white transition-colors">Log in</Link>
