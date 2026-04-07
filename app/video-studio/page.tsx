@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import Image from "next/image"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -317,16 +316,53 @@ function VideoStudioContent() {
 
   const canProcess = videoFile && overlayImage && processingState !== "processing"
 
-  // Overlay preview styles
-  const getPreviewOverlayStyles = useCallback(() => {
-    if (!videoDimensions || !overlayImage) return {}
-    const overlayWidth = (videoDimensions.width * size) / 100
-    const overlayHeight = (overlayImage.height / overlayImage.width) * overlayWidth
-    const coords = getOverlayCoords(videoDimensions.width, videoDimensions.height, overlayWidth, overlayHeight)
+  // Overlay preview styles — positions the overlay relative to the actual
+  // rendered video rect inside the object-contain preview container.
+  // containerRef is set on the video wrapper div so we can measure it.
+  const previewContainerRef = useRef<HTMLDivElement>(null)
+
+  const getPreviewOverlayStyles = useCallback((): React.CSSProperties => {
+    if (!videoDimensions || !overlayImage || !previewContainerRef.current) return { display: "none" }
+
+    const container = previewContainerRef.current
+    const containerW = container.clientWidth
+    const containerH = container.clientHeight
+
+    // Compute the rendered video size inside the container (object-contain letterbox)
+    const videoAR = videoDimensions.width / videoDimensions.height
+    const containerAR = containerW / containerH
+
+    let renderedW: number, renderedH: number
+    if (videoAR > containerAR) {
+      renderedW = containerW
+      renderedH = containerW / videoAR
+    } else {
+      renderedH = containerH
+      renderedW = containerH * videoAR
+    }
+
+    // Letterbox offsets (centred)
+    const offsetX = (containerW - renderedW) / 2
+    const offsetY = (containerH - renderedH) / 2
+
+    // Overlay dimensions in video space
+    const overlayW = (videoDimensions.width * size) / 100
+    const overlayH = (overlayImage.height / overlayImage.width) * overlayW
+
+    // Overlay position in video space
+    const coords = getOverlayCoords(videoDimensions.width, videoDimensions.height, overlayW, overlayH)
+
+    // Scale to rendered video space
+    const scaleX = renderedW / videoDimensions.width
+    const scaleY = renderedH / videoDimensions.height
+
     return {
-      left: `${(coords.x / videoDimensions.width) * 100}%`,
-      top: `${(coords.y / videoDimensions.height) * 100}%`,
-      width: `${size}%`,
+      position: "absolute",
+      left: offsetX + coords.x * scaleX,
+      top: offsetY + coords.y * scaleY,
+      width: overlayW * scaleX,
+      height: "auto",
+      pointerEvents: "none",
     }
   }, [videoDimensions, overlayImage, size, getOverlayCoords])
 
@@ -450,7 +486,7 @@ function VideoStudioContent() {
               ) : (
                 <div className="flex items-center gap-3 p-3 bg-[#0B0F1A] rounded-lg">
                   <div className="w-12 h-12 bg-white rounded flex items-center justify-center overflow-hidden">
-                    <Image src={overlayPreviewUrl} alt="Overlay" width={48} height={48} className="object-contain w-auto h-auto max-w-full max-h-full" />
+                    <img src={overlayPreviewUrl} alt="Overlay" className="object-contain w-full h-full" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[#E2E8F0] truncate">
@@ -548,99 +584,107 @@ function VideoStudioContent() {
             </div>
           </div>
 
-          {/* Right: Preview */}
-          <div className="lg:w-[45%]">
-            <div className="bg-[#131825] rounded-xl border border-[#2A3050]">
-              <div className="px-4 py-3 border-b border-[#2A3050]">
-                <h3 className="text-sm font-semibold text-[#E2E8F0]">
-                  {processingState === "success" ? "Result" : "Preview"}
-                </h3>
-              </div>
+          {/* Right: Preview — portrait (9:16) to match short-form video */}
+          <div className="lg:w-[45%] flex justify-center">
+            <div className="w-full max-w-[340px]">
+              <div className="bg-[#131825] rounded-xl border border-[#2A3050]">
+                <div className="px-4 py-3 border-b border-[#2A3050]">
+                  <h3 className="text-sm font-semibold text-[#E2E8F0]">
+                    {processingState === "success" ? "Result" : "Preview"}
+                  </h3>
+                </div>
 
-              <div className="p-4">
-                {/* Fixed aspect ratio container */}
-                <div className="relative w-full bg-[#0B0F1A] rounded-lg overflow-hidden" style={{ aspectRatio: "16/9" }}>
-                  {/* Idle - no video */}
-                  {processingState !== "success" && !videoPreviewUrl && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-[#8892A8]">
-                      <Upload size={28} className="mb-2 opacity-50" />
-                      <p className="text-sm">Upload a video to preview</p>
-                    </div>
-                  )}
-
-                  {/* Video preview */}
-                  {processingState !== "success" && videoPreviewUrl && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <video
-                        ref={previewVideoRef}
-                        src={videoPreviewUrl}
-                        className="max-w-full max-h-full object-contain"
-                        controls={processingState === "idle"}
-                        muted
-                        onLoadedMetadata={handleVideoMetadata}
-                      />
-                      {overlayImage && videoDimensions && processingState === "idle" && (
-                        <div className="absolute pointer-events-none" style={getPreviewOverlayStyles()}>
-                          <Image src={overlayPreviewUrl || ""} alt="Overlay" width={200} height={100} className="w-full h-auto" />
-                        </div>
-                      )}
-                      {/* Processing overlay */}
-                      {processingState === "processing" && (
-                        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
-                          <Loader2 size={32} className="text-[#6C5CE7] animate-spin mb-3" />
-                          <p className="text-sm text-white mb-2">Processing...</p>
-                          <div className="w-32 h-1.5 bg-[#2A3050] rounded-full overflow-hidden">
-                            <div className="h-full bg-[#6C5CE7] transition-all" style={{ width: `${processingProgress}%` }} />
-                          </div>
-                          <p className="text-xs text-[#8892A8] mt-1">{processingProgress}%</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Success result */}
-                  {processingState === "success" && resultUrl && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <video src={resultUrl} className="max-w-full max-h-full object-contain" controls autoPlay />
-                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-[#00B89490] text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                        <CheckCircle2 size={12} />
-                        Done
+                <div className="p-4">
+                  {/* 9:16 portrait container */}
+                  <div
+                    ref={previewContainerRef}
+                    className="relative w-full bg-[#0B0F1A] rounded-lg overflow-hidden"
+                    style={{ aspectRatio: "9/16" }}
+                  >
+                    {/* Idle – no video */}
+                    {processingState !== "success" && !videoPreviewUrl && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-[#8892A8]">
+                        <Upload size={28} className="mb-2 opacity-50" />
+                        <p className="text-sm">Upload a video to preview</p>
                       </div>
+                    )}
+
+                    {/* Video preview with overlay */}
+                    {processingState !== "success" && videoPreviewUrl && (
+                      <>
+                        <video
+                          ref={previewVideoRef}
+                          src={videoPreviewUrl}
+                          className="absolute inset-0 w-full h-full object-contain"
+                          controls={processingState === "idle"}
+                          muted
+                          onLoadedMetadata={handleVideoMetadata}
+                        />
+                        {overlayImage && videoDimensions && processingState === "idle" && (
+                          <img
+                            src={overlayPreviewUrl || ""}
+                            alt="Overlay"
+                            style={getPreviewOverlayStyles()}
+                          />
+                        )}
+                        {/* Processing overlay */}
+                        {processingState === "processing" && (
+                          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
+                            <Loader2 size={32} className="text-[#6C5CE7] animate-spin mb-3" />
+                            <p className="text-sm text-white mb-2">Processing...</p>
+                            <div className="w-32 h-1.5 bg-[#2A3050] rounded-full overflow-hidden">
+                              <div className="h-full bg-[#6C5CE7] transition-all" style={{ width: `${processingProgress}%` }} />
+                            </div>
+                            <p className="text-xs text-[#8892A8] mt-1">{processingProgress}%</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Success result */}
+                    {processingState === "success" && resultUrl && (
+                      <>
+                        <video src={resultUrl} className="absolute inset-0 w-full h-full object-contain" controls />
+                        <div className="absolute top-2 left-2 flex items-center gap-1 bg-[#00B89490] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                          <CheckCircle2 size={12} />
+                          Done
+                        </div>
+                      </>
+                    )}
+
+                    {/* Error state */}
+                    {processingState === "error" && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <AlertCircle size={28} className="text-[#FF6B6B] mb-2" />
+                        <p className="text-sm text-[#E2E8F0] mb-1">Failed</p>
+                        <p className="text-xs text-[#8892A8] text-center px-4">{errorMessage}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  {processingState === "success" && (
+                    <div className="mt-4 space-y-2">
+                      <Button onClick={handleDownload} className="w-full bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white">
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </Button>
+                      <Button onClick={handlePublish} className="w-full bg-[#00B894] hover:bg-[#00a383] text-white">
+                        <Send className="mr-2 h-4 w-4" />
+                        Publish (@YourChannelName)
+                      </Button>
                     </div>
                   )}
 
-                  {/* Error state */}
                   {processingState === "error" && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <AlertCircle size={28} className="text-[#FF6B6B] mb-2" />
-                      <p className="text-sm text-[#E2E8F0] mb-1">Failed</p>
-                      <p className="text-xs text-[#8892A8] text-center px-4">{errorMessage}</p>
+                    <div className="mt-4">
+                      <Button onClick={() => setProcessingState("idle")} variant="outline" className="w-full border-[#2A3050] text-[#8892A8]">
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Try Again
+                      </Button>
                     </div>
                   )}
                 </div>
-
-                {/* Action buttons */}
-                {processingState === "success" && (
-                  <div className="mt-4 space-y-2">
-                    <Button onClick={handleDownload} className="w-full bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white">
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </Button>
-                    <Button onClick={handlePublish} className="w-full bg-[#00B894] hover:bg-[#00a383] text-white">
-                      <Send className="mr-2 h-4 w-4" />
-                      Publish (@YourChannelName)
-                    </Button>
-                  </div>
-                )}
-
-                {processingState === "error" && (
-                  <div className="mt-4">
-                    <Button onClick={() => setProcessingState("idle")} variant="outline" className="w-full border-[#2A3050] text-[#8892A8]">
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Try Again
-                    </Button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
