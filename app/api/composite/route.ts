@@ -1,314 +1,131 @@
 import { NextResponse } from "next/server"
-import { writeFile, readFile, unlink, mkdir } from "fs/promises"
-import { existsSync } from "fs"
-import { join } from "path"
-import { execFile } from "child_process"
-import { randomUUID } from "crypto"
+import { FFmpeg } from "@ffmpeg/ffmpeg"
+import { fetchFile } from "@ffmpeg/util"
 
-// Resolve FFmpeg/FFprobe paths at runtime.
-// Checks common locations for static binaries, then falls back to system PATH.
-function findBinary(name: "ffmpeg" | "ffprobe"): string {
-  const candidates = [
-    // ffmpeg-static / ffprobe-static put binaries here
-    join(process.cwd(), "node_modules", `${name}-static`, name),
-    join(process.cwd(), "node_modules", `${name}-static`, "bin", name),
-    // .bin symlinks
-    join(process.cwd(), "node_modules", ".bin", name),
-  ]
-  for (const c of candidates) {
-    if (existsSync(c)) return c
-  }
-  // Fall back to system binary
-  return name
-}
-
-const FFMPEG_PATH = findBinary("ffmpeg")
-const FFPROBE_PATH = findBinary("ffprobe")
-
-const TEMP_DIR = "/tmp/marketingplace"
-const FFMPEG_TIMEOUT = 120_000
-
-// Next.js App Router: allow up to 500MB uploads
+// Allow longer execution for video processing
 export const maxDuration = 120
 
-const VALID_VIDEO_EXTENSIONS = [".mp4", ".mov", ".webm"]
-const VALID_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"]
-
+// Position mapping to FFmpeg overlay coordinates
+// We use expressions that evaluate at runtime based on video dimensions
+// W = main video width, H = main video height
+// w = overlay width, h = overlay height
+// Padding of 10px from edges
 const POSITION_MAP: Record<string, { x: string; y: string }> = {
-  "top-left":      { x: "10",        y: "10" },
-  "top-center":    { x: "(W-w)/2",   y: "10" },
-  "top-right":     { x: "W-w-10",    y: "10" },
-  "middle-left":   { x: "10",        y: "(H-h)/2" },
-  "center":        { x: "(W-w)/2",   y: "(H-h)/2" },
-  "middle-right":  { x: "W-w-10",    y: "(H-h)/2" },
-  "bottom-left":   { x: "10",        y: "H-h-10" },
-  "bottom-center": { x: "(W-w)/2",   y: "H-h-10" },
-  "bottom-right":  { x: "W-w-10",    y: "H-h-10" },
-}
-
-interface ProbeResult {
-  width: number
-  height: number
-}
-
-function getFileExtension(filename: string): string {
-  const dot = filename.lastIndexOf(".")
-  if (dot === -1) return ""
-  return filename.slice(dot).toLowerCase()
-}
-
-function probeVideo(videoPath: string): Promise<ProbeResult> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      FFPROBE_PATH,
-      [
-        "-v", "error",
-        "-select_streams", "v:0",
-        "-show_entries", "stream=width,height",
-        "-of", "json",
-        videoPath,
-      ],
-      { timeout: 15_000 },
-      (error, stdout, stderr) => {
-        if (error) {
-          reject(new Error(`ffprobe failed: ${stderr || error.message}`))
-          return
-        }
-        try {
-          const data = JSON.parse(stdout)
-          const stream = data.streams?.[0]
-          if (!stream || !stream.width || !stream.height) {
-            reject(new Error("Could not determine video dimensions"))
-            return
-          }
-          resolve({ width: stream.width, height: stream.height })
-        } catch {
-          reject(new Error("Failed to parse ffprobe output"))
-        }
-      }
-    )
-  })
-}
-
-function runFFmpeg(args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const proc = execFile(
-      FFMPEG_PATH,
-      args,
-      { timeout: FFMPEG_TIMEOUT, maxBuffer: 10 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        if (error) {
-          const msg = stderr ? stderr.slice(-500) : error.message
-          reject(new Error(msg))
-          return
-        }
-        resolve(stderr || stdout)
-      }
-    )
-
-    setTimeout(() => {
-      proc.kill("SIGKILL")
-    }, FFMPEG_TIMEOUT)
-  })
-}
-
-async function cleanupFiles(...paths: string[]) {
-  await Promise.all(
-    paths.map((p) => unlink(p).catch(() => {}))
-  )
-}
-
-// Helper to check if a binary is available (either as a file path or system command)
-async function isBinaryAvailable(binaryPath: string | null): Promise<boolean> {
-  if (!binaryPath) return false
-  
-  // If it's an absolute path, check if file exists
-  if (binaryPath.startsWith("/")) {
-    return existsSync(binaryPath)
-  }
-  
-  // Otherwise, try to run it with --version to check if it's a valid system command
-  return new Promise((resolve) => {
-    execFile(binaryPath, ["-version"], { timeout: 5000 }, (error) => {
-      resolve(!error)
-    })
-  })
+  "top-left": { x: "10", y: "10" },
+  "top-center": { x: "(W-w)/2", y: "10" },
+  "top-right": { x: "W-w-10", y: "10" },
+  "middle-left": { x: "10", y: "(H-h)/2" },
+  "center": { x: "(W-w)/2", y: "(H-h)/2" },
+  "middle-right": { x: "W-w-10", y: "(H-h)/2" },
+  "bottom-left": { x: "10", y: "H-h-10" },
+  "bottom-center": { x: "(W-w)/2", y: "H-h-10" },
+  "bottom-right": { x: "W-w-10", y: "H-h-10" },
 }
 
 export async function POST(request: Request) {
-  // Check FFmpeg availability at runtime
-  const ffmpegAvailable = await isBinaryAvailable(FFMPEG_PATH)
-  const ffprobeAvailable = await isBinaryAvailable(FFPROBE_PATH)
-
-  if (!ffmpegAvailable) {
-    return NextResponse.json(
-      { error: "FFmpeg is not available. Please deploy to Vercel or install FFmpeg locally." },
-      { status: 500 }
-    )
-  }
-  if (!ffprobeAvailable) {
-    return NextResponse.json(
-      { error: "FFprobe is not available. Please deploy to Vercel or install FFmpeg locally." },
-      { status: 500 }
-    )
-  }
-
-  let inputVideoPath = ""
-  let inputOverlayPath = ""
-  let outputPath = ""
-
+  let ffmpeg: FFmpeg | null = null
+  
   try {
-    // Ensure temp directory exists
-    if (!existsSync(TEMP_DIR)) {
-      await mkdir(TEMP_DIR, { recursive: true })
-    }
-
-    // Parse form data
+    // Parse the multipart form data
     const formData = await request.formData()
-    const videoFile = formData.get("video")
-    const overlayFile = formData.get("overlay")
+    const videoFile = formData.get("video") as File | null
+    const overlayFile = formData.get("overlay") as File | null
     const position = (formData.get("position") as string) || "bottom-right"
-    const size = Math.min(50, Math.max(5, Number(formData.get("size")) || 15))
-    const opacity = Math.min(100, Math.max(0, Number(formData.get("opacity")) || 85))
+    const size = parseInt(formData.get("size") as string) || 15
+    const opacity = parseInt(formData.get("opacity") as string) || 85
 
-    // Validate files exist
-    if (!(videoFile instanceof File)) {
-      return NextResponse.json({ error: "Video file is required" }, { status: 400 })
+    // Validate inputs
+    if (!videoFile) {
+      return NextResponse.json({ error: "No video file provided" }, { status: 400 })
     }
-    if (!(overlayFile instanceof File)) {
-      return NextResponse.json({ error: "Overlay file is required" }, { status: 400 })
-    }
-
-    // Validate video file type
-    const videoExt = getFileExtension(videoFile.name)
-    const isValidVideo = videoFile.type.startsWith("video/") || VALID_VIDEO_EXTENSIONS.includes(videoExt)
-    if (!isValidVideo) {
-      return NextResponse.json(
-        { error: `Invalid video file type: ${videoFile.type || videoExt}. Accepted: MP4, MOV, WebM` },
-        { status: 400 }
-      )
-    }
-
-    // Validate video file size (500MB max)
-    if (videoFile.size > 500 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "Video file exceeds 500MB limit" },
-        { status: 400 }
-      )
-    }
-
-    // Validate overlay file type
-    const overlayExt = getFileExtension(overlayFile.name)
-    const isValidOverlay = overlayFile.type.startsWith("image/") || VALID_IMAGE_EXTENSIONS.includes(overlayExt)
-    if (!isValidOverlay) {
-      return NextResponse.json(
-        { error: `Invalid overlay file type: ${overlayFile.type || overlayExt}. Accepted: PNG, JPG, GIF, WebP` },
-        { status: 400 }
-      )
+    if (!overlayFile) {
+      return NextResponse.json({ error: "No overlay file provided" }, { status: 400 })
     }
 
     // Validate position
     if (!POSITION_MAP[position]) {
-      return NextResponse.json(
-        { error: `Invalid position: ${position}` },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Invalid position" }, { status: 400 })
     }
 
-    // Write files to temp directory
-    const sessionId = randomUUID()
-    inputVideoPath = join(TEMP_DIR, `${sessionId}-input${videoExt || ".mp4"}`)
-    inputOverlayPath = join(TEMP_DIR, `${sessionId}-overlay${overlayExt || ".png"}`)
-    outputPath = join(TEMP_DIR, `${sessionId}-output.mp4`)
+    // Initialize FFmpeg WASM
+    ffmpeg = new FFmpeg()
+    
+    // Load FFmpeg with core from CDN
+    await ffmpeg.load({
+      coreURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+      wasmURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm",
+    })
 
-    const videoBuffer = Buffer.from(await videoFile.arrayBuffer())
-    const overlayBuffer = Buffer.from(await overlayFile.arrayBuffer())
+    // Get video file extension
+    const videoExt = videoFile.name.split(".").pop()?.toLowerCase() || "mp4"
+    const inputName = `input.${videoExt}`
+    
+    // Get overlay extension  
+    const overlayExt = overlayFile.name.split(".").pop()?.toLowerCase() || "png"
+    const overlayName = `overlay.${overlayExt}`
 
-    await writeFile(inputVideoPath, videoBuffer)
-    await writeFile(inputOverlayPath, overlayBuffer)
+    // Write input files to FFmpeg virtual filesystem
+    const videoData = await fetchFile(videoFile)
+    const overlayData = await fetchFile(overlayFile)
+    
+    await ffmpeg.writeFile(inputName, videoData)
+    await ffmpeg.writeFile(overlayName, overlayData)
 
-    // Probe video dimensions
-    const { width: videoWidth, height: videoHeight } = await probeVideo(inputVideoPath)
-
-    // Calculate overlay dimensions
-    const overlayWidth = Math.round(videoWidth * size / 100)
-    const opacityDecimal = (opacity / 100).toFixed(2)
-
-    // Calculate position coordinates
-    // We need to know the overlay height after scaling. Use ffprobe on the overlay too,
-    // or compute proportionally. Let's probe the overlay to get aspect ratio.
-    let overlayHeight: number
-    try {
-      const overlayProbe = await probeVideo(inputOverlayPath)
-      overlayHeight = Math.round(overlayWidth * overlayProbe.height / overlayProbe.width)
-    } catch {
-      // For static images, ffprobe may fail on stream detection. Assume 4:1 ratio as fallback.
-      // Use sharp to get dimensions instead.
-      try {
-        const sharp = require("sharp")
-        const meta = await sharp(inputOverlayPath).metadata()
-        if (meta.width && meta.height) {
-          overlayHeight = Math.round(overlayWidth * meta.height / meta.width)
-        } else {
-          overlayHeight = Math.round(overlayWidth / 4)
-        }
-      } catch {
-        overlayHeight = Math.round(overlayWidth / 4)
-      }
-    }
-
-    // Compute pixel positions
-    const pos = POSITION_MAP[position]
-    const xExpr = pos.x
-      .replace(/W/g, String(videoWidth))
-      .replace(/w/g, String(overlayWidth))
-    const yExpr = pos.y
-      .replace(/H/g, String(videoHeight))
-      .replace(/h/g, String(overlayHeight))
-
-    // Evaluate the position expressions
-    const xPos = Function(`"use strict"; return (${xExpr})`)() as number
-    const yPos = Function(`"use strict"; return (${yExpr})`) () as number
+    // Calculate overlay size and position
+    const { x, y } = POSITION_MAP[position]
+    const opacityValue = opacity / 100
 
     // Build FFmpeg filter
-    const isGif = overlayExt === ".gif"
-    const filterComplex = isGif
-      ? `[1:v]scale=${overlayWidth}:-1,format=rgba,colorchannelmixer=aa=${opacityDecimal}[ovrl];[0:v][ovrl]overlay=${xPos}:${yPos}:shortest=1`
-      : `[1:v]scale=${overlayWidth}:-1,format=rgba,colorchannelmixer=aa=${opacityDecimal}[ovrl];[0:v][ovrl]overlay=${xPos}:${yPos}`
-
-    const ffmpegArgs = [
-      "-i", inputVideoPath,
-      ...(isGif ? ["-ignore_loop", "0", "-i", inputOverlayPath] : ["-i", inputOverlayPath]),
-      "-filter_complex", filterComplex,
-      "-codec:a", "copy",
-      "-y",
-      outputPath,
-    ]
+    // 1. Scale the overlay based on video width and desired size percentage
+    // 2. Apply opacity using colorchannelmixer
+    // 3. Overlay at the specified position
+    const filterComplex = [
+      `[1:v]scale=iw*${size}/100:-1,format=rgba,colorchannelmixer=aa=${opacityValue}[ovr]`,
+      `[0:v][ovr]overlay=${x}:${y}`,
+    ].join(";")
 
     // Run FFmpeg
-    await runFFmpeg(ffmpegArgs)
+    await ffmpeg.exec([
+      "-i", inputName,
+      "-i", overlayName,
+      "-filter_complex", filterComplex,
+      "-c:a", "copy", // Copy audio stream
+      "-c:v", "libx264", // Re-encode video with H.264
+      "-preset", "fast",
+      "-crf", "23",
+      "-movflags", "+faststart", // Enable streaming
+      "-y", // Overwrite output
+      "output.mp4",
+    ])
 
-    // Read output and return
-    const outputBuffer = await readFile(outputPath)
+    // Read the output file
+    const outputData = await ffmpeg.readFile("output.mp4")
+    
+    // Clean up
+    await ffmpeg.deleteFile(inputName)
+    await ffmpeg.deleteFile(overlayName)
+    await ffmpeg.deleteFile("output.mp4")
 
-    // Clean up temp files
-    await cleanupFiles(inputVideoPath, inputOverlayPath, outputPath)
-
-    return new NextResponse(outputBuffer, {
+    // Return the composited video
+    return new NextResponse(outputData, {
+      status: 200,
       headers: {
         "Content-Type": "video/mp4",
-        "Content-Disposition": 'attachment; filename="composited.mp4"',
-        "Content-Length": String(outputBuffer.length),
+        "Content-Disposition": `attachment; filename="composited-${Date.now()}.mp4"`,
       },
     })
-  } catch (err) {
-    // Clean up on error
-    await cleanupFiles(inputVideoPath, inputOverlayPath, outputPath)
-
-    const message = err instanceof Error ? err.message : "Unknown error during processing"
-    return NextResponse.json(
-      { error: message.slice(0, 500) },
-      { status: 500 }
-    )
+  } catch (error) {
+    console.error("[v0] FFmpeg processing error:", error)
+    const message = error instanceof Error ? error.message : "Video processing failed"
+    return NextResponse.json({ error: message }, { status: 500 })
+  } finally {
+    // Terminate FFmpeg instance
+    if (ffmpeg) {
+      try {
+        ffmpeg.terminate()
+      } catch {
+        // Ignore termination errors
+      }
+    }
   }
 }
