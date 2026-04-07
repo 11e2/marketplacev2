@@ -750,8 +750,8 @@ function VideoStudioContent() {
             </Button>
           </div>
 
-          {/* Right Panel: Preview / Result (40%) */}
-          <div className="lg:w-[40%]">
+          {/* Right Panel: Preview / Result (32%) */}
+          <div className="lg:w-[32%]">
             <div className="sticky top-6">
               <div className="bg-[#131825] rounded-xl border border-[#2A3050] overflow-hidden">
                 <div className="px-5 py-4 border-b border-[#2A3050]">
