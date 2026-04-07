@@ -5,27 +5,25 @@ import { join } from "path"
 import { execFile } from "child_process"
 import { randomUUID } from "crypto"
 
-// Dynamically resolve FFmpeg and FFprobe paths
-// Try static packages first, then fall back to system binaries
-function resolveBinaryPath(staticPackage: string, systemCommand: string): string | null {
-  // Try the static package
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const staticPath = require(staticPackage)
-    const resolvedPath = typeof staticPath === "string" ? staticPath : staticPath?.path
-    if (resolvedPath && existsSync(resolvedPath)) {
-      return resolvedPath
-    }
-  } catch {
-    // Static package not available
+// Resolve FFmpeg/FFprobe paths at runtime.
+// Checks common locations for static binaries, then falls back to system PATH.
+function findBinary(name: "ffmpeg" | "ffprobe"): string {
+  const candidates = [
+    // ffmpeg-static / ffprobe-static put binaries here
+    join(process.cwd(), "node_modules", `${name}-static`, name),
+    join(process.cwd(), "node_modules", `${name}-static`, "bin", name),
+    // .bin symlinks
+    join(process.cwd(), "node_modules", ".bin", name),
+  ]
+  for (const c of candidates) {
+    if (existsSync(c)) return c
   }
-  
-  // Fall back to system binary (works when ffmpeg is installed globally)
-  return systemCommand
+  // Fall back to system binary
+  return name
 }
 
-const FFMPEG_PATH = resolveBinaryPath("ffmpeg-static", "ffmpeg")
-const FFPROBE_PATH = resolveBinaryPath("ffprobe-static", "ffprobe")
+const FFMPEG_PATH = findBinary("ffmpeg")
+const FFPROBE_PATH = findBinary("ffprobe")
 
 const TEMP_DIR = "/tmp/marketingplace"
 const FFMPEG_TIMEOUT = 120_000

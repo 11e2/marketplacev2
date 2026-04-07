@@ -6,7 +6,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  serverExternalPackages: ["sharp", "ffmpeg-static", "ffprobe-static"],
+  serverExternalPackages: ["sharp"],
 }
 
 export default nextConfig
