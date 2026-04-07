@@ -750,123 +750,131 @@ function VideoStudioContent() {
             </Button>
           </div>
 
-          {/* Right Panel: Preview / Result (32%) */}
-          <div className="lg:w-[32%]">
+          {/* Right Panel: Preview / Result */}
+          <div className="lg:w-[280px] xl:w-[320px] shrink-0">
             <div className="sticky top-6">
-              <div className="bg-[#131825] rounded-xl border border-[#2A3050] h-[600px] flex flex-col">
-                <div className="px-5 py-4 border-b border-[#2A3050]">
+              <div className="bg-[#131825] rounded-xl border border-[#2A3050]">
+                {/* Header */}
+                <div className="px-4 py-3 border-b border-[#2A3050]">
                   <h2 className="text-sm font-semibold text-[#E2E8F0]">
                     {processingState === "success" ? "Result" : "Preview"}
                   </h2>
                 </div>
 
-                <div className="p-5 flex-1">
-                  {/* Idle state */}
-                  {processingState === "idle" && !videoPreviewUrl && (
-                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center text-[#8892A8]">
-                      <Upload size={32} className="mb-3 opacity-40" />
-                      <p className="text-sm font-medium">Upload a video to preview</p>
-                    </div>
-                  )}
+                {/* Content area - fixed height container */}
+                <div className="p-4">
+                  {/* Video preview area - 16:9 aspect ratio with max height */}
+                  <div className="w-full h-[180px] bg-[#0B0F1A] rounded-lg flex items-center justify-center relative overflow-hidden">
+                    {/* Idle - no video */}
+                    {processingState === "idle" && !videoPreviewUrl && (
+                      <div className="flex flex-col items-center justify-center text-[#8892A8]">
+                        <Upload size={24} className="mb-2 opacity-40" />
+                        <p className="text-xs font-medium">Upload a video</p>
+                      </div>
+                    )}
 
-                  {/* Preview with video */}
-                  {processingState === "idle" && videoPreviewUrl && (
-                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg overflow-hidden relative">
-                      <video
-                        ref={previewVideoRef}
-                        src={videoPreviewUrl}
-                        className="w-full h-full object-contain"
-                        controls
-                        muted
-                        onLoadedMetadata={handleVideoMetadata}
-                      />
-                      {overlayImage && videoDimensions && (
-                        <div
-                          className="absolute pointer-events-none"
-                          style={getPreviewOverlayStyles()}
-                        >
-                          <Image
-                            src={overlayPreviewUrl || ""}
-                            alt="Overlay"
-                            width={200}
-                            height={100}
-                            className="w-full h-auto object-contain"
+                    {/* Preview with video */}
+                    {processingState === "idle" && videoPreviewUrl && (
+                      <>
+                        <video
+                          ref={previewVideoRef}
+                          src={videoPreviewUrl}
+                          className="max-w-full max-h-full object-contain"
+                          controls
+                          muted
+                          onLoadedMetadata={handleVideoMetadata}
+                        />
+                        {overlayImage && videoDimensions && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={getPreviewOverlayStyles()}
+                          >
+                            <Image
+                              src={overlayPreviewUrl || ""}
+                              alt="Overlay"
+                              width={100}
+                              height={50}
+                              className="w-full h-auto object-contain"
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Processing */}
+                    {processingState === "processing" && (
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader2 size={28} className="text-[#6C5CE7] animate-spin mb-2" />
+                        <p className="text-xs font-medium text-[#E2E8F0] mb-1">Processing...</p>
+                        <div className="w-32 h-1.5 bg-[#2A3050] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#6C5CE7] transition-all duration-300"
+                            style={{ width: `${processingProgress}%` }}
                           />
                         </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Processing state */}
-                  {processingState === "processing" && (
-                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center">
-                      <Loader2 size={48} className="text-[#6C5CE7] animate-spin mb-4" />
-                      <p className="text-sm font-medium text-[#E2E8F0] mb-2">Processing video...</p>
-                      <div className="w-48 h-2 bg-[#2A3050] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#6C5CE7] transition-all duration-300"
-                          style={{ width: `${processingProgress}%` }}
-                        />
+                        <p className="text-[10px] text-[#8892A8] mt-1">{processingProgress}%</p>
                       </div>
-                      <p className="text-xs text-[#8892A8] mt-2">{processingProgress}% complete</p>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Success state */}
+                    {/* Success - result video */}
+                    {processingState === "success" && resultUrl && (
+                      <video
+                        src={resultUrl}
+                        className="max-w-full max-h-full object-contain"
+                        controls
+                      />
+                    )}
+
+                    {/* Error */}
+                    {processingState === "error" && (
+                      <div className="flex flex-col items-center justify-center p-4 text-center">
+                        <AlertCircle size={24} className="text-[#FF6B6B] mb-2" />
+                        <p className="text-xs font-medium text-[#E2E8F0] mb-1">Failed</p>
+                        <p className="text-[10px] text-[#8892A8] line-clamp-2">{errorMessage}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action buttons - only show when relevant */}
                   {processingState === "success" && resultUrl && (
-                    <div className="space-y-4">
-                      <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg overflow-hidden">
-                        <video
-                          src={resultUrl}
-                          className="w-full h-full object-contain"
-                          controls
-                        />
-                      </div>
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={handleDownload}
-                          className="flex-1 bg-[#00B894] hover:bg-[#00a383] text-white"
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Download
-                        </Button>
-                        <Button
-                          onClick={handleProcessAgain}
-                          variant="outline"
-                          className="border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0]"
-                        >
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Edit
-                        </Button>
-                      </div>
-                      {/* Publish Button */}
+                    <div className="mt-3 space-y-2">
+                      <Button
+                        onClick={handleDownload}
+                        size="sm"
+                        className="w-full bg-[#00B894] hover:bg-[#00a383] text-white text-xs h-8"
+                      >
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                        Download
+                      </Button>
                       <Button
                         onClick={handlePublish}
-                        className="w-full bg-[#00B894] hover:bg-[#00a383] text-white"
+                        size="sm"
+                        className="w-full bg-[#00B894] hover:bg-[#00a383] text-white text-xs h-8"
                       >
-                        <Send className="mr-2 h-4 w-4" />
+                        <Send className="mr-1.5 h-3.5 w-3.5" />
                         Publish (@YourChannelName)
                       </Button>
-                      {isFromCampaign && (
-                        <p className="text-xs text-[#8892A8] text-center">
-                          Download your video and upload it to {campaignBrand}&apos;s preferred platform
-                        </p>
-                      )}
+                      <Button
+                        onClick={handleProcessAgain}
+                        size="sm"
+                        variant="outline"
+                        className="w-full border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0] text-xs h-8"
+                      >
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
                     </div>
                   )}
 
-                  {/* Error state */}
                   {processingState === "error" && (
-                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center p-6">
-                      <AlertCircle size={48} className="text-[#FF6B6B] mb-4" />
-                      <p className="text-sm font-medium text-[#E2E8F0] mb-2">Processing Failed</p>
-                      <p className="text-xs text-[#8892A8] text-center mb-4">{errorMessage}</p>
+                    <div className="mt-3">
                       <Button
                         onClick={() => setProcessingState("idle")}
+                        size="sm"
                         variant="outline"
-                        className="border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0]"
+                        className="w-full border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0] text-xs h-8"
                       >
-                        <RefreshCw className="mr-2 h-4 w-4" />
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                         Try Again
                       </Button>
                     </div>
