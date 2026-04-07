@@ -4,9 +4,15 @@ import { existsSync } from "fs"
 import { join } from "path"
 import { execFile } from "child_process"
 import { randomUUID } from "crypto"
+import ffmpegPath from "ffmpeg-static"
+import ffprobePath from "ffprobe-static"
 
 // Next.js App Router: allow up to 500MB uploads
 export const maxDuration = 120
+
+// Resolve binary paths - ffmpeg-static exports the path directly, ffprobe-static exports an object
+const FFMPEG_PATH = ffmpegPath || "ffmpeg"
+const FFPROBE_PATH = typeof ffprobePath === "string" ? ffprobePath : ffprobePath?.path || "ffprobe"
 
 const TEMP_DIR = "/tmp/marketingplace"
 const FFMPEG_TIMEOUT = 120_000
@@ -40,7 +46,7 @@ function getFileExtension(filename: string): string {
 function probeVideo(videoPath: string): Promise<ProbeResult> {
   return new Promise((resolve, reject) => {
     execFile(
-      "ffprobe",
+      FFPROBE_PATH,
       [
         "-v", "error",
         "-select_streams", "v:0",
@@ -73,7 +79,7 @@ function probeVideo(videoPath: string): Promise<ProbeResult> {
 function runFFmpeg(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = execFile(
-      "ffmpeg",
+      FFMPEG_PATH,
       args,
       { timeout: FFMPEG_TIMEOUT, maxBuffer: 10 * 1024 * 1024 },
       (error, stdout, stderr) => {
@@ -100,16 +106,17 @@ async function cleanupFiles(...paths: string[]) {
 
 export async function POST(request: Request) {
   // Check FFmpeg availability
-  try {
-    await new Promise<void>((resolve, reject) => {
-      execFile("ffmpeg", ["-version"], { timeout: 5000 }, (error) => {
-        if (error) reject(error)
-        else resolve()
-      })
-    })
-  } catch {
+  if (!FFMPEG_PATH || !existsSync(FFMPEG_PATH)) {
+    console.error("[v0] FFmpeg binary not found at:", FFMPEG_PATH)
     return NextResponse.json(
       { error: "FFmpeg is not available on this system" },
+      { status: 500 }
+    )
+  }
+  if (!FFPROBE_PATH || !existsSync(FFPROBE_PATH)) {
+    console.error("[v0] FFprobe binary not found at:", FFPROBE_PATH)
+    return NextResponse.json(
+      { error: "FFprobe is not available on this system" },
       { status: 500 }
     )
   }
