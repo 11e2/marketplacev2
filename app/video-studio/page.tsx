@@ -6,6 +6,7 @@ import Image from "next/image"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import {
   Upload,
@@ -17,8 +18,12 @@ import {
   Image as ImageIcon,
   Zap,
   ArrowLeft,
+  Settings2,
+  Grid3X3,
+  Send,
 } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 
 const POSITION_GRID = [
   ["top-left", "top-center", "top-right"],
@@ -40,34 +45,12 @@ const POSITION_LABELS: Record<Position, string> = {
   "bottom-right": "Bottom Right",
 }
 
-// Calculate overlay position on canvas
-function getOverlayCoords(
-  position: Position,
-  videoWidth: number,
-  videoHeight: number,
-  overlayWidth: number,
-  overlayHeight: number,
-  padding = 20
-): { x: number; y: number } {
-  const positions: Record<Position, { x: number; y: number }> = {
-    "top-left": { x: padding, y: padding },
-    "top-center": { x: (videoWidth - overlayWidth) / 2, y: padding },
-    "top-right": { x: videoWidth - overlayWidth - padding, y: padding },
-    "middle-left": { x: padding, y: (videoHeight - overlayHeight) / 2 },
-    "center": { x: (videoWidth - overlayWidth) / 2, y: (videoHeight - overlayHeight) / 2 },
-    "middle-right": { x: videoWidth - overlayWidth - padding, y: (videoHeight - overlayHeight) / 2 },
-    "bottom-left": { x: padding, y: videoHeight - overlayHeight - padding },
-    "bottom-center": { x: (videoWidth - overlayWidth) / 2, y: videoHeight - overlayHeight - padding },
-    "bottom-right": { x: videoWidth - overlayWidth - padding, y: videoHeight - overlayHeight - padding },
-  }
-  return positions[position]
-}
-
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024 // 100MB
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"]
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"]
 
 type ProcessingState = "idle" | "processing" | "success" | "error"
+type PositionMode = "grid" | "advanced"
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -87,8 +70,10 @@ function VideoStudioContent() {
   // Video state
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
+  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const hiddenVideoRef = useRef<HTMLVideoElement>(null)
+  const previewVideoRef = useRef<HTMLVideoElement>(null)
 
   // Overlay state
   const [overlayFile, setOverlayFile] = useState<File | null>(null)
@@ -98,9 +83,12 @@ function VideoStudioContent() {
   const overlayInputRef = useRef<HTMLInputElement>(null)
 
   // Settings
+  const [positionMode, setPositionMode] = useState<PositionMode>("grid")
   const [position, setPosition] = useState<Position>("bottom-right")
+  const [customX, setCustomX] = useState(20) // percentage from left
+  const [customY, setCustomY] = useState(80) // percentage from top
   const [size, setSize] = useState(15)
-  const [opacity, setOpacity] = useState(85)
+  const padding = 20 // fixed padding in pixels
 
   // Processing state
   const [processingState, setProcessingState] = useState<ProcessingState>("idle")
@@ -119,7 +107,7 @@ function VideoStudioContent() {
     }
   }, [isFromCampaign, campaignAssetUrl, isPreloaded])
 
-  // Load overlay image when file changes
+  // Load overlay image when URL changes
   useEffect(() => {
     if (!overlayPreviewUrl) {
       setOverlayImage(null)
@@ -135,6 +123,46 @@ function VideoStudioContent() {
     }
     img.src = overlayPreviewUrl
   }, [overlayPreviewUrl])
+
+  // Calculate overlay coordinates for both preview and processing
+  const getOverlayCoords = useCallback((
+    videoWidth: number,
+    videoHeight: number,
+    overlayWidth: number,
+    overlayHeight: number
+  ): { x: number; y: number } => {
+    if (positionMode === "advanced") {
+      // Custom coordinates (percentage-based)
+      return {
+        x: (customX / 100) * videoWidth - overlayWidth / 2,
+        y: (customY / 100) * videoHeight - overlayHeight / 2,
+      }
+    }
+
+    // Grid-based positioning
+    const positions: Record<Position, { x: number; y: number }> = {
+      "top-left": { x: padding, y: padding },
+      "top-center": { x: (videoWidth - overlayWidth) / 2, y: padding },
+      "top-right": { x: videoWidth - overlayWidth - padding, y: padding },
+      "middle-left": { x: padding, y: (videoHeight - overlayHeight) / 2 },
+      "center": { x: (videoWidth - overlayWidth) / 2, y: (videoHeight - overlayHeight) / 2 },
+      "middle-right": { x: videoWidth - overlayWidth - padding, y: (videoHeight - overlayHeight) / 2 },
+      "bottom-left": { x: padding, y: videoHeight - overlayHeight - padding },
+      "bottom-center": { x: (videoWidth - overlayWidth) / 2, y: videoHeight - overlayHeight - padding },
+      "bottom-right": { x: videoWidth - overlayWidth - padding, y: videoHeight - overlayHeight - padding },
+    }
+    return positions[position]
+  }, [positionMode, position, customX, customY, padding])
+
+  // Get video dimensions when loaded
+  const handleVideoMetadata = useCallback(() => {
+    if (previewVideoRef.current) {
+      setVideoDimensions({
+        width: previewVideoRef.current.videoWidth,
+        height: previewVideoRef.current.videoHeight,
+      })
+    }
+  }, [])
 
   // Handle video selection
   const handleVideoSelect = useCallback((file: File) => {
@@ -153,6 +181,7 @@ function VideoStudioContent() {
 
     setVideoFile(file)
     setVideoPreviewUrl(URL.createObjectURL(file))
+    setVideoDimensions(null)
     setProcessingState("idle")
     setResultUrl(null)
   }, [videoPreviewUrl])
@@ -179,6 +208,7 @@ function VideoStudioContent() {
     if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl)
     setVideoFile(null)
     setVideoPreviewUrl(null)
+    setVideoDimensions(null)
     setProcessingState("idle")
     setResultUrl(null)
   }, [videoPreviewUrl])
@@ -222,10 +252,10 @@ function VideoStudioContent() {
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
 
-      // Calculate overlay dimensions
+      // Calculate overlay dimensions (opacity always 100%)
       const overlayWidth = (video.videoWidth * size) / 100
       const overlayHeight = (overlayImage.height / overlayImage.width) * overlayWidth
-      const overlayPos = getOverlayCoords(position, video.videoWidth, video.videoHeight, overlayWidth, overlayHeight)
+      const overlayPos = getOverlayCoords(video.videoWidth, video.videoHeight, overlayWidth, overlayHeight)
 
       // Set up MediaRecorder with canvas stream
       const stream = canvas.captureStream(30) // 30 FPS
@@ -305,10 +335,8 @@ function VideoStudioContent() {
         // Draw video frame
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-        // Draw overlay with opacity
-        ctx.globalAlpha = opacity / 100
+        // Draw overlay at 100% opacity
         ctx.drawImage(overlayImage, overlayPos.x, overlayPos.y, overlayWidth, overlayHeight)
-        ctx.globalAlpha = 1
 
         // Update progress
         const progress = (video.currentTime / video.duration) * 100
@@ -346,7 +374,7 @@ function VideoStudioContent() {
       setErrorMessage(err instanceof Error ? err.message : "Video processing failed")
       setProcessingState("error")
     }
-  }, [videoFile, videoPreviewUrl, overlayImage, position, size, opacity, resultUrl])
+  }, [videoFile, videoPreviewUrl, overlayImage, size, getOverlayCoords, resultUrl])
 
   // Reset for re-processing
   const handleProcessAgain = useCallback(() => {
@@ -367,7 +395,28 @@ function VideoStudioContent() {
     document.body.removeChild(a)
   }, [resultUrl])
 
+  // Publish handler
+  const handlePublish = useCallback(() => {
+    toast.success("Video ready to publish! Connect your account to post directly.")
+  }, [])
+
   const canProcess = videoFile && overlayImage && processingState !== "processing"
+
+  // Calculate preview overlay styles that match actual processing
+  const getPreviewOverlayStyles = useCallback(() => {
+    if (!videoDimensions || !overlayImage) return {}
+    
+    const overlayWidth = (videoDimensions.width * size) / 100
+    const overlayHeight = (overlayImage.height / overlayImage.width) * overlayWidth
+    const coords = getOverlayCoords(videoDimensions.width, videoDimensions.height, overlayWidth, overlayHeight)
+    
+    // Convert to percentage for responsive preview
+    return {
+      left: `${(coords.x / videoDimensions.width) * 100}%`,
+      top: `${(coords.y / videoDimensions.height) * 100}%`,
+      width: `${size}%`,
+    }
+  }, [videoDimensions, overlayImage, size, getOverlayCoords])
 
   return (
     <div className="flex min-h-screen bg-[#0B0F1A] dark">
@@ -548,30 +597,119 @@ function VideoStudioContent() {
             <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-5 space-y-5">
               <h2 className="text-sm font-semibold text-[#E2E8F0]">Overlay Settings</h2>
 
-              {/* Position Grid */}
+              {/* Position Mode Toggle */}
               <div>
-                <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
-                  Position
+                <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider mb-2 block">
+                  Position Mode
                 </label>
-                <div className="mt-2 grid grid-cols-3 gap-1.5 w-36">
-                  {POSITION_GRID.flat().map((pos) => (
-                    <button
-                      key={pos}
-                      onClick={() => setPosition(pos)}
-                      className={cn(
-                        "w-10 h-10 rounded border-2 transition-colors",
-                        position === pos
-                          ? "bg-[#6C5CE7] border-[#6C5CE7]"
-                          : "bg-[#0B0F1A] border-[#2A3050] hover:border-[#6C5CE7]/50"
-                      )}
-                      aria-label={POSITION_LABELS[pos]}
-                    />
-                  ))}
+                <div className="flex items-center bg-[#0B0F1A] rounded-lg p-1 w-fit">
+                  <button
+                    onClick={() => setPositionMode("grid")}
+                    className={cn(
+                      "flex items-center gap-2 py-2 px-3 text-xs font-semibold rounded-md transition-all",
+                      positionMode === "grid"
+                        ? "bg-[#6C5CE7] text-white"
+                        : "text-[#8892A8] hover:text-[#E2E8F0]"
+                    )}
+                  >
+                    <Grid3X3 size={14} />
+                    Grid
+                  </button>
+                  <button
+                    onClick={() => setPositionMode("advanced")}
+                    className={cn(
+                      "flex items-center gap-2 py-2 px-3 text-xs font-semibold rounded-md transition-all",
+                      positionMode === "advanced"
+                        ? "bg-[#6C5CE7] text-white"
+                        : "text-[#8892A8] hover:text-[#E2E8F0]"
+                    )}
+                  >
+                    <Settings2 size={14} />
+                    Advanced
+                  </button>
                 </div>
-                <p className="text-xs text-[#8892A8] mt-2">
-                  {POSITION_LABELS[position]}
-                </p>
               </div>
+
+              {/* Grid Position */}
+              {positionMode === "grid" && (
+                <div>
+                  <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
+                    Position
+                  </label>
+                  <div className="mt-2 grid grid-cols-3 gap-1.5 w-36">
+                    {POSITION_GRID.flat().map((pos) => (
+                      <button
+                        key={pos}
+                        onClick={() => setPosition(pos)}
+                        className={cn(
+                          "w-10 h-10 rounded border-2 transition-colors",
+                          position === pos
+                            ? "bg-[#6C5CE7] border-[#6C5CE7]"
+                            : "bg-[#0B0F1A] border-[#2A3050] hover:border-[#6C5CE7]/50"
+                        )}
+                        aria-label={POSITION_LABELS[pos]}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-[#8892A8] mt-2">
+                    {POSITION_LABELS[position]}
+                  </p>
+                </div>
+              )}
+
+              {/* Advanced Position Controls */}
+              {positionMode === "advanced" && (
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
+                        X Position (from left)
+                      </label>
+                      <span className="text-xs font-mono text-[#E2E8F0]">{customX}%</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Slider
+                        value={[customX]}
+                        onValueChange={([val]) => setCustomX(val)}
+                        min={0}
+                        max={100}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        value={customX}
+                        onChange={(e) => setCustomX(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-16 h-8 text-xs bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
+                        Y Position (from top)
+                      </label>
+                      <span className="text-xs font-mono text-[#E2E8F0]">{customY}%</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Slider
+                        value={[customY]}
+                        onValueChange={([val]) => setCustomY(val)}
+                        min={0}
+                        max={100}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        value={customY}
+                        onChange={(e) => setCustomY(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-16 h-8 text-xs bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Size Slider */}
               <div>
@@ -587,24 +725,6 @@ function VideoStudioContent() {
                   min={5}
                   max={50}
                   step={1}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Opacity Slider */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
-                    Opacity
-                  </label>
-                  <span className="text-xs font-mono text-[#E2E8F0]">{opacity}%</span>
-                </div>
-                <Slider
-                  value={[opacity]}
-                  onValueChange={([val]) => setOpacity(val)}
-                  min={10}
-                  max={100}
-                  step={5}
                   className="w-full"
                 />
               </div>
@@ -653,21 +773,17 @@ function VideoStudioContent() {
                   {processingState === "idle" && videoPreviewUrl && (
                     <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg overflow-hidden relative">
                       <video
+                        ref={previewVideoRef}
                         src={videoPreviewUrl}
                         className="w-full h-full object-contain"
                         controls
                         muted
+                        onLoadedMetadata={handleVideoMetadata}
                       />
-                      {overlayImage && (
+                      {overlayImage && videoDimensions && (
                         <div
                           className="absolute pointer-events-none"
-                          style={{
-                            [position.includes("top") ? "top" : position.includes("bottom") ? "bottom" : "top"]: position.includes("middle") ? "50%" : "12px",
-                            [position.includes("left") ? "left" : position.includes("right") ? "right" : "left"]: position.includes("center") ? "50%" : "12px",
-                            transform: `${position.includes("center") && !position.includes("top") && !position.includes("bottom") ? "translateX(-50%)" : ""} ${position === "center" || position.includes("middle") ? "translateY(-50%)" : ""}`,
-                            width: `${size}%`,
-                            opacity: opacity / 100,
-                          }}
+                          style={getPreviewOverlayStyles()}
                         >
                           <Image
                             src={overlayPreviewUrl || ""}
@@ -723,6 +839,14 @@ function VideoStudioContent() {
                           Edit
                         </Button>
                       </div>
+                      {/* Publish Button */}
+                      <Button
+                        onClick={handlePublish}
+                        className="w-full bg-[#00B894] hover:bg-[#00a383] text-white"
+                      >
+                        <Send className="mr-2 h-4 w-4" />
+                        Publish (@YourChannelName)
+                      </Button>
                       {isFromCampaign && (
                         <p className="text-xs text-[#8892A8] text-center">
                           Download your video and upload it to {campaignBrand}&apos;s preferred platform
