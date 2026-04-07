@@ -12,6 +12,13 @@ export interface Campaign {
   budget: string
   spots: number
   accentColor: string
+  // Clipping campaign specific fields
+  isClipping?: boolean
+  brandAssetUrl?: string
+  cpm?: number
+  minFollowers?: number
+  minViews?: number
+  totalBudget?: number
 }
 
 export interface TrendingChannel {

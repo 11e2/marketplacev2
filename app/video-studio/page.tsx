@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
+import Image from "next/image"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -13,7 +15,10 @@ import {
   AlertCircle,
   RefreshCw,
   Image as ImageIcon,
+  Zap,
+  ArrowLeft,
 } from "lucide-react"
+import Link from "next/link"
 
 const POSITION_GRID = [
   ["top-left", "top-center", "top-right"],
@@ -70,7 +75,15 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function VideoStudioPage() {
+function VideoStudioContent() {
+  const searchParams = useSearchParams()
+  
+  // Campaign data from URL params
+  const campaignId = searchParams.get("campaignId")
+  const campaignBrand = searchParams.get("brand")
+  const campaignAssetUrl = searchParams.get("assetUrl")
+  const isFromCampaign = !!campaignId && !!campaignAssetUrl
+
   // Video state
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
@@ -81,7 +94,7 @@ export default function VideoStudioPage() {
   const [overlayFile, setOverlayFile] = useState<File | null>(null)
   const [overlayPreviewUrl, setOverlayPreviewUrl] = useState<string | null>(null)
   const [overlayImage, setOverlayImage] = useState<HTMLImageElement | null>(null)
-  const [isDemo, setIsDemo] = useState(false)
+  const [isPreloaded, setIsPreloaded] = useState(false)
   const overlayInputRef = useRef<HTMLInputElement>(null)
 
   // Settings
@@ -98,6 +111,14 @@ export default function VideoStudioPage() {
   // Canvas ref for processing
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
+  // Load campaign asset if coming from marketplace
+  useEffect(() => {
+    if (isFromCampaign && campaignAssetUrl && !isPreloaded) {
+      setOverlayPreviewUrl(campaignAssetUrl)
+      setIsPreloaded(true)
+    }
+  }, [isFromCampaign, campaignAssetUrl, isPreloaded])
+
   // Load overlay image when file changes
   useEffect(() => {
     if (!overlayPreviewUrl) {
@@ -105,7 +126,7 @@ export default function VideoStudioPage() {
       return
     }
 
-    const img = new Image()
+    const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload = () => setOverlayImage(img)
     img.onerror = () => {
@@ -144,45 +165,14 @@ export default function VideoStudioPage() {
       return
     }
 
-    if (overlayPreviewUrl && !isDemo) URL.revokeObjectURL(overlayPreviewUrl)
+    if (overlayPreviewUrl && !isPreloaded) URL.revokeObjectURL(overlayPreviewUrl)
 
     setOverlayFile(file)
     setOverlayPreviewUrl(URL.createObjectURL(file))
-    setIsDemo(false)
+    setIsPreloaded(false)
     setProcessingState("idle")
     setResultUrl(null)
-  }, [overlayPreviewUrl, isDemo])
-
-  // Use demo asset
-  const handleUseDemo = useCallback(() => {
-    const canvas = document.createElement("canvas")
-    canvas.width = 200
-    canvas.height = 60
-    const ctx = canvas.getContext("2d")!
-    
-    ctx.fillStyle = "rgba(255, 255, 255, 0.9)"
-    ctx.beginPath()
-    ctx.roundRect(0, 0, 200, 60, 8)
-    ctx.fill()
-    
-    ctx.fillStyle = "#6C5CE7"
-    ctx.font = "bold 20px Inter, system-ui, sans-serif"
-    ctx.textAlign = "center"
-    ctx.textBaseline = "middle"
-    ctx.fillText("BRAND DEMO", 100, 30)
-    
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], "demo-overlay.png", { type: "image/png" })
-        if (overlayPreviewUrl && !isDemo) URL.revokeObjectURL(overlayPreviewUrl)
-        setOverlayFile(file)
-        setOverlayPreviewUrl(URL.createObjectURL(file))
-        setIsDemo(true)
-        setProcessingState("idle")
-        setResultUrl(null)
-      }
-    }, "image/png")
-  }, [overlayPreviewUrl, isDemo])
+  }, [overlayPreviewUrl, isPreloaded])
 
   // Clear video
   const handleClearVideo = useCallback(() => {
@@ -195,14 +185,14 @@ export default function VideoStudioPage() {
 
   // Clear overlay
   const handleClearOverlay = useCallback(() => {
-    if (overlayPreviewUrl && !isDemo) URL.revokeObjectURL(overlayPreviewUrl)
+    if (overlayPreviewUrl && !isPreloaded) URL.revokeObjectURL(overlayPreviewUrl)
     setOverlayFile(null)
     setOverlayPreviewUrl(null)
     setOverlayImage(null)
-    setIsDemo(false)
+    setIsPreloaded(false)
     setProcessingState("idle")
     setResultUrl(null)
-  }, [overlayPreviewUrl, isDemo])
+  }, [overlayPreviewUrl, isPreloaded])
 
   // Process video using Canvas + MediaRecorder
   const handleProcess = useCallback(async () => {
@@ -380,7 +370,7 @@ export default function VideoStudioPage() {
   const canProcess = videoFile && overlayImage && processingState !== "processing"
 
   return (
-    <div className="flex min-h-screen bg-background dark">
+    <div className="flex min-h-screen bg-[#0B0F1A] dark">
       <SidebarNav mode="creator" />
 
       {/* Hidden elements for processing */}
@@ -388,19 +378,47 @@ export default function VideoStudioPage() {
       <canvas ref={canvasRef} className="hidden" />
 
       <main className="flex-1 p-6 lg:p-8">
+        {/* Header with campaign context */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Video Studio</h1>
-          <p className="text-muted-foreground mt-1">
-            Overlay brand assets onto your video content
-          </p>
+          {isFromCampaign ? (
+            <div className="flex items-center gap-4 mb-4">
+              <Link
+                href="/marketplace"
+                className="flex items-center gap-2 text-sm text-[#8892A8] hover:text-[#E2E8F0] transition-colors"
+              >
+                <ArrowLeft size={16} />
+                Back to Marketplace
+              </Link>
+            </div>
+          ) : null}
+          
+          <div className="flex items-center gap-3">
+            {isFromCampaign && (
+              <div className="w-10 h-10 rounded-xl bg-[#6C5CE720] flex items-center justify-center">
+                <Zap size={20} className="text-[#6C5CE7]" />
+              </div>
+            )}
+            <div>
+              <h1 className="text-2xl font-bold text-[#E2E8F0]">
+                {isFromCampaign ? `${campaignBrand} Campaign` : "Video Studio"}
+              </h1>
+              <p className="text-[#8892A8] mt-0.5 text-sm">
+                {isFromCampaign
+                  ? "Upload your video to apply the brand overlay and submit"
+                  : "Overlay brand assets onto your video content"}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Panel: Upload and Configure (60%) */}
           <div className="lg:w-[60%] space-y-6">
             {/* Video Upload */}
-            <div className="bg-card rounded-xl border border-border p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-3">Video Upload</h2>
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-5">
+              <h2 className="text-sm font-semibold text-[#E2E8F0] mb-3">
+                {isFromCampaign ? "Upload Your Video" : "Video Upload"}
+              </h2>
               {!videoFile ? (
                 <div
                   onClick={() => videoInputRef.current?.click()}
@@ -410,18 +428,18 @@ export default function VideoStudioPage() {
                     const file = e.dataTransfer.files[0]
                     if (file) handleVideoSelect(file)
                   }}
-                  className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-[#6C5CE7] hover:bg-[rgba(108,92,231,0.05)] transition-colors"
+                  className="border-2 border-dashed border-[#2A3050] rounded-lg p-8 text-center cursor-pointer hover:border-[#6C5CE7] hover:bg-[#6C5CE710] transition-colors"
                 >
-                  <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-                  <p className="text-sm text-foreground font-medium">
+                  <Upload className="mx-auto h-10 w-10 text-[#8892A8] mb-3" />
+                  <p className="text-sm text-[#E2E8F0] font-medium">
                     Drop your video here or click to browse
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-[#8892A8] mt-1">
                     MP4, MOV, or WebM up to 100MB
                   </p>
                 </div>
               ) : (
-                <div className="flex items-start gap-4 p-4 bg-secondary rounded-lg">
+                <div className="flex items-start gap-4 p-4 bg-[#0B0F1A] rounded-lg">
                   {videoPreviewUrl && (
                     <video
                       src={videoPreviewUrl}
@@ -430,10 +448,10 @@ export default function VideoStudioPage() {
                     />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
+                    <p className="text-sm font-medium text-[#E2E8F0] truncate">
                       {videoFile.name}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-[#8892A8]">
                       {formatFileSize(videoFile.size)}
                     </p>
                   </div>
@@ -441,7 +459,7 @@ export default function VideoStudioPage() {
                     variant="ghost"
                     size="icon"
                     onClick={handleClearVideo}
-                    className="shrink-0"
+                    className="shrink-0 text-[#8892A8] hover:text-[#E2E8F0]"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -459,10 +477,10 @@ export default function VideoStudioPage() {
               />
             </div>
 
-            {/* Brand Asset Upload */}
-            <div className="bg-card rounded-xl border border-border p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-3">Brand Asset</h2>
-              {!overlayFile ? (
+            {/* Brand Asset */}
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-5">
+              <h2 className="text-sm font-semibold text-[#E2E8F0] mb-3">Brand Asset</h2>
+              {!overlayPreviewUrl ? (
                 <div className="space-y-3">
                   <div
                     onClick={() => overlayInputRef.current?.click()}
@@ -472,46 +490,46 @@ export default function VideoStudioPage() {
                       const file = e.dataTransfer.files[0]
                       if (file) handleOverlaySelect(file)
                     }}
-                    className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-[#6C5CE7] hover:bg-[rgba(108,92,231,0.05)] transition-colors"
+                    className="border-2 border-dashed border-[#2A3050] rounded-lg p-6 text-center cursor-pointer hover:border-[#6C5CE7] hover:bg-[#6C5CE710] transition-colors"
                   >
-                    <ImageIcon className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-sm text-foreground font-medium">
+                    <ImageIcon className="mx-auto h-8 w-8 text-[#8892A8] mb-2" />
+                    <p className="text-sm text-[#E2E8F0] font-medium">
                       Drop your brand asset here
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-[#8892A8] mt-1">
                       PNG, JPG, GIF, or WebP
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleUseDemo}
-                  >
-                    Use Demo Asset
-                  </Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-4 p-4 bg-secondary rounded-lg">
-                  {overlayPreviewUrl && (
-                    <img
+                <div className="flex items-center gap-4 p-4 bg-[#0B0F1A] rounded-lg">
+                  <div className="w-16 h-12 bg-white rounded-lg flex items-center justify-center p-2">
+                    <Image
                       src={overlayPreviewUrl}
                       alt="Overlay preview"
-                      className="h-12 object-contain rounded"
+                      width={56}
+                      height={40}
+                      className="object-contain max-h-full"
                     />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {isDemo ? "Demo Overlay" : overlayFile.name}
-                    </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleClearOverlay}
-                    className="shrink-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#E2E8F0] truncate">
+                      {isPreloaded ? `${campaignBrand} Brand Asset` : overlayFile?.name || "Brand Overlay"}
+                    </p>
+                    {isPreloaded && (
+                      <p className="text-xs text-[#6C5CE7]">Preloaded from campaign</p>
+                    )}
+                  </div>
+                  {!isPreloaded && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleClearOverlay}
+                      className="shrink-0 text-[#8892A8] hover:text-[#E2E8F0]"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               )}
               <input
@@ -527,12 +545,12 @@ export default function VideoStudioPage() {
             </div>
 
             {/* Overlay Settings */}
-            <div className="bg-card rounded-xl border border-border p-5 space-y-5">
-              <h2 className="text-sm font-semibold text-foreground">Overlay Settings</h2>
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-5 space-y-5">
+              <h2 className="text-sm font-semibold text-[#E2E8F0]">Overlay Settings</h2>
 
               {/* Position Grid */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
                   Position
                 </label>
                 <div className="mt-2 grid grid-cols-3 gap-1.5 w-36">
@@ -544,13 +562,13 @@ export default function VideoStudioPage() {
                         "w-10 h-10 rounded border-2 transition-colors",
                         position === pos
                           ? "bg-[#6C5CE7] border-[#6C5CE7]"
-                          : "bg-secondary border-border hover:border-[#6C5CE7]/50"
+                          : "bg-[#0B0F1A] border-[#2A3050] hover:border-[#6C5CE7]/50"
                       )}
                       aria-label={POSITION_LABELS[pos]}
                     />
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-[#8892A8] mt-2">
                   {POSITION_LABELS[position]}
                 </p>
               </div>
@@ -558,38 +576,35 @@ export default function VideoStudioPage() {
               {/* Size Slider */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
                     Size
                   </label>
-                  <span className="text-xs font-mono text-foreground">{size}%</span>
+                  <span className="text-xs font-mono text-[#E2E8F0]">{size}%</span>
                 </div>
                 <Slider
                   value={[size]}
-                  onValueChange={([v]) => setSize(v)}
+                  onValueChange={([val]) => setSize(val)}
                   min={5}
                   max={50}
                   step={1}
                   className="w-full"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Percentage of video width
-                </p>
               </div>
 
               {/* Opacity Slider */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
                     Opacity
                   </label>
-                  <span className="text-xs font-mono text-foreground">{opacity}%</span>
+                  <span className="text-xs font-mono text-[#E2E8F0]">{opacity}%</span>
                 </div>
                 <Slider
                   value={[opacity]}
-                  onValueChange={([v]) => setOpacity(v)}
-                  min={0}
+                  onValueChange={([val]) => setOpacity(val)}
+                  min={10}
                   max={100}
-                  step={1}
+                  step={5}
                   className="w-full"
                 />
               </div>
@@ -599,106 +614,157 @@ export default function VideoStudioPage() {
             <Button
               onClick={handleProcess}
               disabled={!canProcess}
-              className="w-full h-12 bg-[#6C5CE7] hover:bg-[#5B4BD5] text-white font-semibold"
+              className="w-full bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white py-6 text-base font-semibold disabled:opacity-50"
             >
               {processingState === "processing" ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Processing... {processingProgress}%
                 </>
               ) : (
-                "Process Video"
+                <>
+                  <Zap className="mr-2 h-5 w-5" />
+                  {isFromCampaign ? "Create & Submit" : "Process Video"}
+                </>
               )}
             </Button>
           </div>
 
-          {/* Right Panel: Preview and Download (40%) */}
+          {/* Right Panel: Preview / Result (40%) */}
           <div className="lg:w-[40%]">
-            <div className="bg-card rounded-xl border border-border p-5 min-h-[400px] flex flex-col">
-              <h2 className="text-sm font-semibold text-foreground mb-4">Preview</h2>
-
-              {processingState === "idle" && !resultUrl && (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-                  <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
-                    <Upload className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Upload a video and brand asset, then click Process to see your result
-                  </p>
+            <div className="sticky top-6">
+              <div className="bg-[#131825] rounded-xl border border-[#2A3050] overflow-hidden">
+                <div className="px-5 py-4 border-b border-[#2A3050]">
+                  <h2 className="text-sm font-semibold text-[#E2E8F0]">
+                    {processingState === "success" ? "Result" : "Preview"}
+                  </h2>
                 </div>
-              )}
 
-              {processingState === "processing" && (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-                  <Loader2 className="h-12 w-12 text-[#6C5CE7] animate-spin mb-4" />
-                  <p className="text-sm font-medium text-foreground mb-2">
-                    Processing your video...
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {processingProgress}% complete
-                  </p>
-                  <div className="w-full max-w-xs mt-4 h-2 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#6C5CE7] transition-all duration-300"
-                      style={{ width: `${processingProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+                <div className="p-5">
+                  {/* Idle state */}
+                  {processingState === "idle" && !videoPreviewUrl && (
+                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center text-[#8892A8]">
+                      <Upload size={32} className="mb-3 opacity-40" />
+                      <p className="text-sm font-medium">Upload a video to preview</p>
+                    </div>
+                  )}
 
-              {processingState === "success" && resultUrl && (
-                <div className="flex-1 flex flex-col">
-                  <div className="flex-1 bg-black rounded-lg overflow-hidden mb-4">
-                    <video
-                      src={resultUrl}
-                      controls
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={handleDownload}
-                      className="flex-1 bg-[#00B894] hover:bg-[#00A885] text-white"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleProcessAgain}
-                      className="flex-1"
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Edit Settings
-                    </Button>
-                  </div>
-                </div>
-              )}
+                  {/* Preview with video */}
+                  {processingState === "idle" && videoPreviewUrl && (
+                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg overflow-hidden relative">
+                      <video
+                        src={videoPreviewUrl}
+                        className="w-full h-full object-contain"
+                        controls
+                        muted
+                      />
+                      {overlayImage && (
+                        <div
+                          className="absolute pointer-events-none"
+                          style={{
+                            [position.includes("top") ? "top" : position.includes("bottom") ? "bottom" : "top"]: position.includes("middle") ? "50%" : "12px",
+                            [position.includes("left") ? "left" : position.includes("right") ? "right" : "left"]: position.includes("center") ? "50%" : "12px",
+                            transform: `${position.includes("center") && !position.includes("top") && !position.includes("bottom") ? "translateX(-50%)" : ""} ${position === "center" || position.includes("middle") ? "translateY(-50%)" : ""}`,
+                            width: `${size}%`,
+                            opacity: opacity / 100,
+                          }}
+                        >
+                          <Image
+                            src={overlayPreviewUrl || ""}
+                            alt="Overlay"
+                            width={200}
+                            height={100}
+                            className="w-full h-auto object-contain"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-              {processingState === "error" && (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-                  <div className="w-16 h-16 rounded-full bg-[rgba(255,107,107,0.1)] flex items-center justify-center mb-4">
-                    <AlertCircle className="h-8 w-8 text-[#FF6B6B]" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground mb-2">
-                    Processing Failed
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    {errorMessage || "An error occurred while processing your video"}
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() => setProcessingState("idle")}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Try Again
-                  </Button>
+                  {/* Processing state */}
+                  {processingState === "processing" && (
+                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center">
+                      <Loader2 size={48} className="text-[#6C5CE7] animate-spin mb-4" />
+                      <p className="text-sm font-medium text-[#E2E8F0] mb-2">Processing video...</p>
+                      <div className="w-48 h-2 bg-[#2A3050] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#6C5CE7] transition-all duration-300"
+                          style={{ width: `${processingProgress}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-[#8892A8] mt-2">{processingProgress}% complete</p>
+                    </div>
+                  )}
+
+                  {/* Success state */}
+                  {processingState === "success" && resultUrl && (
+                    <div className="space-y-4">
+                      <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg overflow-hidden">
+                        <video
+                          src={resultUrl}
+                          className="w-full h-full object-contain"
+                          controls
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleDownload}
+                          className="flex-1 bg-[#00B894] hover:bg-[#00a383] text-white"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </Button>
+                        <Button
+                          onClick={handleProcessAgain}
+                          variant="outline"
+                          className="border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0]"
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Edit
+                        </Button>
+                      </div>
+                      {isFromCampaign && (
+                        <p className="text-xs text-[#8892A8] text-center">
+                          Download your video and upload it to {campaignBrand}&apos;s preferred platform
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Error state */}
+                  {processingState === "error" && (
+                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center p-6">
+                      <AlertCircle size={48} className="text-[#FF6B6B] mb-4" />
+                      <p className="text-sm font-medium text-[#E2E8F0] mb-2">Processing Failed</p>
+                      <p className="text-xs text-[#8892A8] text-center mb-4">{errorMessage}</p>
+                      <Button
+                        onClick={() => setProcessingState("idle")}
+                        variant="outline"
+                        className="border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0]"
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
       </main>
     </div>
+  )
+}
+
+export default function VideoStudioPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen bg-[#0B0F1A] dark items-center justify-center">
+        <Loader2 size={32} className="text-[#6C5CE7] animate-spin" />
+      </div>
+    }>
+      <VideoStudioContent />
+    </Suspense>
   )
 }
