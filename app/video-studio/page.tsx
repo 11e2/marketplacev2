@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -15,6 +15,8 @@ import {
   RefreshCw,
   Image as ImageIcon,
 } from "lucide-react"
+import { FFmpeg } from "@ffmpeg/ffmpeg"
+import { toBlobURL, fetchFile } from "@ffmpeg/util"
 
 const POSITION_GRID = [
   ["top-left", "top-center", "top-right"],
@@ -36,11 +38,27 @@ const POSITION_LABELS: Record<Position, string> = {
   "bottom-right": "Bottom Right",
 }
 
-const MAX_VIDEO_SIZE = 500 * 1024 * 1024 // 500MB
+// Position to FFmpeg overlay expression
+function getOverlayPosition(position: Position, padding = 20): string {
+  const map: Record<Position, string> = {
+    "top-left": `${padding}:${padding}`,
+    "top-center": `(W-w)/2:${padding}`,
+    "top-right": `W-w-${padding}:${padding}`,
+    "middle-left": `${padding}:(H-h)/2`,
+    "center": `(W-w)/2:(H-h)/2`,
+    "middle-right": `W-w-${padding}:(H-h)/2`,
+    "bottom-left": `${padding}:H-h-${padding}`,
+    "bottom-center": `(W-w)/2:H-h-${padding}`,
+    "bottom-right": `W-w-${padding}:H-h-${padding}`,
+  }
+  return map[position]
+}
+
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024 // 100MB for client-side processing
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"]
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"]
 
-type ProcessingState = "idle" | "processing" | "success" | "error"
+type ProcessingState = "idle" | "loading-ffmpeg" | "processing" | "success" | "error"
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -49,6 +67,11 @@ function formatFileSize(bytes: number): string {
 }
 
 export default function VideoStudioPage() {
+  // FFmpeg instance
+  const ffmpegRef = useRef<FFmpeg | null>(null)
+  const [ffmpegLoaded, setFfmpegLoaded] = useState(false)
+  const [loadProgress, setLoadProgress] = useState(0)
+
   // Video state
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
@@ -67,8 +90,43 @@ export default function VideoStudioPage() {
 
   // Processing state
   const [processingState, setProcessingState] = useState<ProcessingState>("idle")
+  const [processingProgress, setProcessingProgress] = useState("")
   const [errorMessage, setErrorMessage] = useState<string>("")
   const [resultUrl, setResultUrl] = useState<string | null>(null)
+
+  // Load FFmpeg on mount
+  useEffect(() => {
+    const loadFFmpeg = async () => {
+      if (ffmpegRef.current) return
+
+      const ffmpeg = new FFmpeg()
+      ffmpegRef.current = ffmpeg
+
+      ffmpeg.on("progress", ({ progress }) => {
+        setProcessingProgress(`Processing: ${Math.round(progress * 100)}%`)
+      })
+
+      try {
+        setProcessingState("loading-ffmpeg")
+        
+        // Load FFmpeg core from CDN with CORS-enabled URLs
+        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm"
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+        })
+
+        setFfmpegLoaded(true)
+        setProcessingState("idle")
+      } catch (err) {
+        console.error("Failed to load FFmpeg:", err)
+        setErrorMessage("Failed to load video processing engine. Please refresh the page.")
+        setProcessingState("error")
+      }
+    }
+
+    loadFFmpeg()
+  }, [])
 
   // Handle video selection
   const handleVideoSelect = useCallback((file: File) => {
@@ -78,12 +136,11 @@ export default function VideoStudioPage() {
       return
     }
     if (file.size > MAX_VIDEO_SIZE) {
-      setErrorMessage("Video file must be under 500MB")
+      setErrorMessage("Video file must be under 100MB for browser processing")
       setProcessingState("error")
       return
     }
 
-    // Clean up previous preview
     if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl)
 
     setVideoFile(file)
@@ -111,19 +168,16 @@ export default function VideoStudioPage() {
 
   // Use demo asset
   const handleUseDemo = useCallback(async () => {
-    // Create a demo overlay image using canvas
     const canvas = document.createElement("canvas")
     canvas.width = 200
     canvas.height = 60
     const ctx = canvas.getContext("2d")!
     
-    // Semi-transparent white background with rounded corners
     ctx.fillStyle = "rgba(255, 255, 255, 0.9)"
     ctx.beginPath()
     ctx.roundRect(0, 0, 200, 60, 8)
     ctx.fill()
     
-    // Purple text
     ctx.fillStyle = "#6C5CE7"
     ctx.font = "bold 20px Inter, system-ui, sans-serif"
     ctx.textAlign = "center"
@@ -162,49 +216,65 @@ export default function VideoStudioPage() {
     setResultUrl(null)
   }, [overlayPreviewUrl, isDemo])
 
-  // Process video
+  // Process video using client-side FFmpeg
   const handleProcess = useCallback(async () => {
-    if (!videoFile || !overlayFile) return
+    if (!videoFile || !overlayFile || !ffmpegRef.current || !ffmpegLoaded) return
 
+    const ffmpeg = ffmpegRef.current
     setProcessingState("processing")
+    setProcessingProgress("Preparing files...")
     setErrorMessage("")
 
     try {
-      const formData = new FormData()
-      formData.append("video", videoFile)
-      formData.append("overlay", overlayFile)
-      formData.append("position", position)
-      formData.append("size", size.toString())
-      formData.append("opacity", opacity.toString())
-
-      const response = await fetch("/api/composite", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const text = await response.text()
-        let errorText = "Processing failed"
-        try {
-          const json = JSON.parse(text)
-          errorText = json.error || errorText
-        } catch {
-          errorText = text || errorText
-        }
-        throw new Error(errorText)
-      }
-
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
+      // Write input files to FFmpeg virtual filesystem
+      const videoData = await fetchFile(videoFile)
+      const overlayData = await fetchFile(overlayFile)
       
+      await ffmpeg.writeFile("input.mp4", videoData)
+      await ffmpeg.writeFile("overlay.png", overlayData)
+
+      setProcessingProgress("Processing video...")
+
+      // Build FFmpeg command
+      // Scale overlay relative to video width, apply opacity, position it
+      const overlayPos = getOverlayPosition(position)
+      const scaleExpr = `iw*${size / 100}:-1`
+      
+      // FFmpeg filter: scale overlay, apply opacity, overlay on video
+      const filterComplex = opacity < 100
+        ? `[1:v]scale=${scaleExpr},format=rgba,colorchannelmixer=aa=${opacity / 100}[ov];[0:v][ov]overlay=${overlayPos}`
+        : `[1:v]scale=${scaleExpr}[ov];[0:v][ov]overlay=${overlayPos}`
+
+      await ffmpeg.exec([
+        "-i", "input.mp4",
+        "-i", "overlay.png",
+        "-filter_complex", filterComplex,
+        "-c:a", "copy",
+        "-preset", "ultrafast",
+        "output.mp4"
+      ])
+
+      setProcessingProgress("Finalizing...")
+
+      // Read output file
+      const outputData = await ffmpeg.readFile("output.mp4")
+      const outputBlob = new Blob([outputData], { type: "video/mp4" })
+      const url = URL.createObjectURL(outputBlob)
+
+      // Cleanup FFmpeg filesystem
+      await ffmpeg.deleteFile("input.mp4")
+      await ffmpeg.deleteFile("overlay.png")
+      await ffmpeg.deleteFile("output.mp4")
+
       if (resultUrl) URL.revokeObjectURL(resultUrl)
       setResultUrl(url)
       setProcessingState("success")
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred")
+      console.error("FFmpeg processing error:", err)
+      setErrorMessage(err instanceof Error ? err.message : "Video processing failed")
       setProcessingState("error")
     }
-  }, [videoFile, overlayFile, position, size, opacity, resultUrl])
+  }, [videoFile, overlayFile, ffmpegLoaded, position, size, opacity, resultUrl])
 
   // Reset for re-processing
   const handleProcessAgain = useCallback(() => {
@@ -224,7 +294,7 @@ export default function VideoStudioPage() {
     document.body.removeChild(a)
   }, [resultUrl])
 
-  const canProcess = videoFile && overlayFile && processingState !== "processing"
+  const canProcess = videoFile && overlayFile && ffmpegLoaded && processingState !== "processing" && processingState !== "loading-ffmpeg"
 
   return (
     <div className="flex min-h-screen bg-background dark">
@@ -260,7 +330,7 @@ export default function VideoStudioPage() {
                     Drop your video here or click to browse
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    MP4, MOV, or WebM up to 500MB
+                    MP4, MOV, or WebM up to 100MB
                   </p>
                 </div>
               ) : (
@@ -444,10 +514,15 @@ export default function VideoStudioPage() {
               disabled={!canProcess}
               className="w-full h-12 bg-[#6C5CE7] hover:bg-[#5B4BD5] text-white font-semibold"
             >
-              {processingState === "processing" ? (
+              {processingState === "loading-ffmpeg" ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  Loading video engine...
+                </>
+              ) : processingState === "processing" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {processingProgress || "Processing..."}
                 </>
               ) : (
                 "Process Video"
@@ -460,7 +535,7 @@ export default function VideoStudioPage() {
             <div className="bg-card rounded-xl border border-border p-5 min-h-[400px] flex flex-col">
               <h2 className="text-sm font-semibold text-foreground mb-4">Preview</h2>
 
-              {processingState === "idle" && !resultUrl && (
+              {(processingState === "idle" || processingState === "loading-ffmpeg") && !resultUrl && (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
                   <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
                     <Play className="h-6 w-6 text-muted-foreground" />
@@ -471,6 +546,12 @@ export default function VideoStudioPage() {
                   <p className="text-xs text-muted-foreground mt-2 max-w-[200px]">
                     Upload a video and brand asset, then click Process Video
                   </p>
+                  {processingState === "loading-ffmpeg" && (
+                    <p className="text-xs text-[#6C5CE7] mt-3 flex items-center gap-1.5">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading video engine...
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -478,10 +559,10 @@ export default function VideoStudioPage() {
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
                   <Loader2 className="h-10 w-10 text-[#6C5CE7] animate-spin mb-4" />
                   <p className="text-sm text-foreground font-medium">
-                    Processing your video...
+                    {processingProgress || "Processing your video..."}
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    This usually takes 30 to 60 seconds
+                    This may take a minute depending on video length
                   </p>
                 </div>
               )}
@@ -528,21 +609,21 @@ export default function VideoStudioPage() {
                 <div className="flex-1 flex flex-col items-center justify-center p-6">
                   <div className="bg-[rgba(255,107,107,0.1)] border border-[#FF6B6B]/30 rounded-lg p-4 text-center w-full">
                     <AlertCircle className="h-8 w-8 text-[#FF6B6B] mx-auto mb-3" />
-                    <p className="text-sm font-medium text-[#FF6B6B]">
+                    <p className="text-sm font-semibold text-foreground mb-1">
                       Processing Failed
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground">
                       {errorMessage}
                     </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setProcessingState("idle")}
-                      className="mt-4"
-                    >
-                      Try Again
-                    </Button>
                   </div>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setProcessingState("idle")}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Try Again
+                  </Button>
                 </div>
               )}
             </div>
