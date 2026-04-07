@@ -14,19 +14,6 @@ import {
 import { toast } from "sonner"
 import { tickerItems, channelCategories } from "@/lib/data"
 
-const heroPills = [
-  { label: "TikTok", color: "#6C5CE7", delay: "0s", pos: "top-20 left-[8%]", anim: "animate-float-slow" },
-  { label: "YouTube Preroll", color: "#FF4444", delay: "1s", pos: "top-32 right-[10%]", anim: "animate-float-right" },
-  { label: "Discord Server", color: "#4ECDC4", delay: "2s", pos: "top-56 left-[18%]", anim: "animate-float-left" },
-  { label: "Podcast Ad Read", color: "#FF9F43", delay: "0.5s", pos: "top-48 right-[22%]", anim: "animate-float-slow" },
-  { label: "Newsletter", color: "#4A9EFF", delay: "1.5s", pos: "bottom-48 left-[6%]", anim: "animate-float-right" },
-  { label: "Tweet Thread", color: "#94A3B8", delay: "2.5s", pos: "bottom-40 right-[8%]", anim: "animate-float-left" },
-  { label: "Twitch Stream", color: "#9146FF", delay: "3s", pos: "bottom-64 left-[28%]", anim: "animate-float-slow" },
-  { label: "Instagram Story", color: "#E91E8C", delay: "1.2s", pos: "bottom-56 right-[28%]", anim: "animate-float-right" },
-  { label: "Reddit Post", color: "#FF5700", delay: "0.8s", pos: "top-72 left-[40%]", anim: "animate-float-left" },
-  { label: "Video Clip", color: "#00B894", delay: "2.2s", pos: "bottom-72 right-[42%]", anim: "animate-float-slow" },
-]
-
 const features = [
   {
     icon: Handshake,
@@ -85,32 +72,7 @@ export default function LandingPage() {
         {/* Background gradient */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#131825_0%,_#0B0F1A_70%)]" />
 
-        {/* Floating pills */}
-        {heroPills.map((pill) => (
-          <div
-            key={pill.label}
-            className={`absolute hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${pill.pos} ${pill.anim}`}
-            style={{
-              borderColor: `${pill.color}40`,
-              backgroundColor: `${pill.color}15`,
-              color: pill.color,
-              animationDelay: pill.delay,
-            }}
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: pill.color }}
-            />
-            {pill.label}
-          </div>
-        ))}
-
         <div className="relative z-10 max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-[#131825] border border-[#2A3050] rounded-full px-4 py-1.5 text-xs text-[#8892A8] mb-8">
-            <span className="w-2 h-2 rounded-full bg-[#00B894] animate-pulse" />
-            $18.4M+ in creator payouts processed
-          </div>
-
           <h1 className="text-5xl md:text-7xl font-bold leading-tight text-balance mb-6">
             Every channel.{" "}
             <br />
