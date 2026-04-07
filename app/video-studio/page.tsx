@@ -16,10 +16,7 @@ import {
   AlertCircle,
   RefreshCw,
   Image as ImageIcon,
-  Zap,
   ArrowLeft,
-  Settings2,
-  Grid3X3,
   Send,
   CheckCircle2,
 } from "lucide-react"
@@ -35,15 +32,15 @@ const POSITION_GRID = [
 type Position = (typeof POSITION_GRID)[number][number]
 
 const POSITION_LABELS: Record<Position, string> = {
-  "top-left": "Top Left",
-  "top-center": "Top Center",
-  "top-right": "Top Right",
-  "middle-left": "Middle Left",
-  "center": "Center",
-  "middle-right": "Middle Right",
-  "bottom-left": "Bottom Left",
-  "bottom-center": "Bottom Center",
-  "bottom-right": "Bottom Right",
+  "top-left": "TL",
+  "top-center": "TC",
+  "top-right": "TR",
+  "middle-left": "ML",
+  "center": "C",
+  "middle-right": "MR",
+  "bottom-left": "BL",
+  "bottom-center": "BC",
+  "bottom-right": "BR",
 }
 
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024
@@ -52,12 +49,6 @@ const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/web
 
 type ProcessingState = "idle" | "processing" | "success" | "error"
 type PositionMode = "grid" | "advanced"
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 function VideoStudioContent() {
   const searchParams = useSearchParams()
@@ -74,7 +65,6 @@ function VideoStudioContent() {
   const videoInputRef = useRef<HTMLInputElement>(null)
   const hiddenVideoRef = useRef<HTMLVideoElement>(null)
   const previewVideoRef = useRef<HTMLVideoElement>(null)
-  const previewContainerRef = useRef<HTMLDivElement>(null)
 
   // Overlay state
   const [overlayFile, setOverlayFile] = useState<File | null>(null)
@@ -327,7 +317,7 @@ function VideoStudioContent() {
 
   const canProcess = videoFile && overlayImage && processingState !== "processing"
 
-  // Overlay preview styles — match actual processing coords
+  // Overlay preview styles
   const getPreviewOverlayStyles = useCallback(() => {
     if (!videoDimensions || !overlayImage) return {}
     const overlayWidth = (videoDimensions.width * size) / 100
@@ -348,37 +338,30 @@ function VideoStudioContent() {
       <video ref={hiddenVideoRef} className="hidden" playsInline crossOrigin="anonymous" />
       <canvas ref={canvasRef} className="hidden" />
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2A3050] shrink-0">
+      <main className="flex-1 p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             {isFromCampaign && (
               <Link
                 href="/marketplace"
-                className="flex items-center gap-1.5 text-sm text-[#8892A8] hover:text-[#E2E8F0] transition-colors mr-2"
+                className="flex items-center gap-1.5 text-sm text-[#8892A8] hover:text-[#E2E8F0] transition-colors"
               >
-                <ArrowLeft size={15} />
-                Back
+                <ArrowLeft size={16} />
               </Link>
             )}
-            <div className="w-8 h-8 rounded-lg bg-[#6C5CE720] flex items-center justify-center">
-              <Zap size={16} className="text-[#6C5CE7]" />
-            </div>
             <div>
-              <h1 className="text-base font-bold text-[#E2E8F0] leading-none">
-                {isFromCampaign ? `${campaignBrand} — Video Studio` : "Video Studio"}
+              <h1 className="text-xl font-bold text-[#E2E8F0]">
+                {isFromCampaign ? `Apply to ${campaignBrand}` : "Video Studio"}
               </h1>
-              <p className="text-xs text-[#8892A8] mt-0.5">
-                {isFromCampaign ? "Apply brand overlay and submit your clip" : "Overlay brand assets onto your video"}
+              <p className="text-sm text-[#8892A8]">
+                Overlay brand assets onto your video
               </p>
             </div>
           </div>
-
-          {/* Process button in topbar */}
           <Button
             onClick={processingState === "success" ? handleProcessAgain : handleProcess}
             disabled={processingState === "success" ? false : !canProcess}
-            size="sm"
             className={cn(
               "font-semibold",
               processingState === "success"
@@ -388,35 +371,35 @@ function VideoStudioContent() {
           >
             {processingState === "processing" ? (
               <>
-                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {processingProgress}%
               </>
             ) : processingState === "success" ? (
               <>
-                <RefreshCw className="mr-1.5 h-4 w-4" />
-                Re-edit
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Edit Again
               </>
             ) : (
-              <>
-                <Zap className="mr-1.5 h-4 w-4" />
-                {isFromCampaign ? "Create & Submit" : "Process Video"}
-              </>
+              "Process Video"
             )}
           </Button>
         </div>
 
-        {/* Main studio layout */}
-        <div className="flex flex-1 overflow-hidden">
-
-          {/* === LEFT: Large Preview === */}
-          <div className="flex-1 flex flex-col items-center justify-center bg-[#080C14] p-6 overflow-hidden">
-            <div
-              ref={previewContainerRef}
-              className="relative w-full max-w-lg"
-              style={{ aspectRatio: videoDimensions ? `${videoDimensions.width}/${videoDimensions.height}` : "16/9" }}
-            >
-              {/* No video uploaded */}
-              {!videoPreviewUrl && processingState !== "processing" && processingState !== "success" && (
+        {/* Two-column layout */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left: Controls */}
+          <div className="lg:w-[55%] space-y-4">
+            {/* Video Upload */}
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-4">
+              <h3 className="text-sm font-semibold text-[#E2E8F0] mb-3">Video</h3>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleVideoSelect(e.target.files[0])}
+              />
+              {!videoPreviewUrl ? (
                 <div
                   onClick={() => videoInputRef.current?.click()}
                   onDragOver={(e) => e.preventDefault()}
@@ -425,307 +408,239 @@ function VideoStudioContent() {
                     const file = e.dataTransfer.files[0]
                     if (file) handleVideoSelect(file)
                   }}
-                  className="absolute inset-0 rounded-xl border-2 border-dashed border-[#2A3050] bg-[#131825] flex flex-col items-center justify-center cursor-pointer hover:border-[#6C5CE7] hover:bg-[#6C5CE708] transition-colors"
+                  className="h-24 border-2 border-dashed border-[#2A3050] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#6C5CE7] transition-colors"
                 >
-                  <Upload size={36} className="text-[#8892A8] mb-3 opacity-60" />
-                  <p className="text-sm font-semibold text-[#E2E8F0]">Drop your video here</p>
-                  <p className="text-xs text-[#8892A8] mt-1">MP4, MOV, or WebM · Max 100MB</p>
+                  <Upload size={20} className="text-[#8892A8] mb-1" />
+                  <span className="text-sm text-[#8892A8]">Upload video (max 100MB)</span>
                 </div>
-              )}
-
-              {/* Video preview with overlay */}
-              {videoPreviewUrl && processingState !== "success" && (
-                <div className="absolute inset-0 rounded-xl overflow-hidden bg-black">
-                  <video
-                    ref={previewVideoRef}
-                    src={videoPreviewUrl}
-                    className="w-full h-full object-contain"
-                    controls={processingState === "idle"}
-                    muted
-                    onLoadedMetadata={handleVideoMetadata}
-                  />
-                  {/* Overlay preview */}
-                  {overlayImage && videoDimensions && processingState === "idle" && (
-                    <div
-                      className="absolute pointer-events-none"
-                      style={getPreviewOverlayStyles()}
-                    >
-                      <Image
-                        src={overlayPreviewUrl || ""}
-                        alt="Brand overlay"
-                        width={300}
-                        height={150}
-                        className="w-full h-auto object-contain"
-                      />
-                    </div>
-                  )}
-                  {/* Processing overlay */}
-                  {processingState === "processing" && (
-                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center rounded-xl">
-                      <Loader2 size={40} className="text-[#6C5CE7] animate-spin mb-4" />
-                      <p className="text-sm font-semibold text-white mb-3">Processing video...</p>
-                      <div className="w-48 h-2 bg-[#2A3050] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#6C5CE7] transition-all duration-200 rounded-full"
-                          style={{ width: `${processingProgress}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-[#8892A8] mt-2">{processingProgress}% complete</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Success result */}
-              {processingState === "success" && resultUrl && (
-                <div className="absolute inset-0 rounded-xl overflow-hidden bg-black">
-                  <video
-                    src={resultUrl}
-                    className="w-full h-full object-contain"
-                    controls
-                    autoPlay
-                  />
-                  {/* Success badge */}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-[#00B89490] backdrop-blur-sm text-white text-xs font-semibold px-2.5 py-1 rounded-full">
-                    <CheckCircle2 size={12} />
-                    Processed
-                  </div>
-                </div>
-              )}
-
-              {/* Error state */}
-              {processingState === "error" && (
-                <div className="absolute inset-0 rounded-xl bg-[#131825] border border-[#FF6B6B40] flex flex-col items-center justify-center">
-                  <AlertCircle size={36} className="text-[#FF6B6B] mb-3" />
-                  <p className="text-sm font-semibold text-[#E2E8F0] mb-1">Processing Failed</p>
-                  <p className="text-xs text-[#8892A8] text-center max-w-xs px-4">{errorMessage}</p>
-                  <Button
-                    onClick={() => setProcessingState("idle")}
-                    size="sm"
-                    variant="outline"
-                    className="mt-4 border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0]"
-                  >
-                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                    Try Again
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Download + Publish below preview on success */}
-            {processingState === "success" && resultUrl && (
-              <div className="flex gap-3 mt-5 w-full max-w-lg">
-                <Button
-                  onClick={handleDownload}
-                  className="flex-1 bg-[#00B894] hover:bg-[#00a383] text-white font-semibold"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download
-                </Button>
-                <Button
-                  onClick={handlePublish}
-                  className="flex-1 bg-[#00B894] hover:bg-[#00a383] text-white font-semibold"
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Publish (@YourChannelName)
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* === RIGHT: Controls Sidebar === */}
-          <div className="w-72 xl:w-80 shrink-0 border-l border-[#2A3050] bg-[#0D1120] flex flex-col overflow-y-auto">
-
-            {/* Video upload row */}
-            <div className="p-4 border-b border-[#2A3050]">
-              <p className="text-[10px] font-semibold text-[#8892A8] uppercase tracking-wider mb-2">
-                {isFromCampaign ? "Your Video" : "Video"}
-              </p>
-              {!videoFile ? (
-                <button
-                  onClick={() => videoInputRef.current?.click()}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-dashed border-[#2A3050] hover:border-[#6C5CE7] hover:bg-[#6C5CE708] transition-colors text-left"
-                >
-                  <Upload size={16} className="text-[#8892A8] shrink-0" />
-                  <span className="text-xs text-[#8892A8]">Click to upload video</span>
-                </button>
               ) : (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#131825]">
-                  <div className="w-10 h-7 bg-[#0B0F1A] rounded overflow-hidden shrink-0">
-                    {videoPreviewUrl && (
-                      <video src={videoPreviewUrl} className="w-full h-full object-cover" muted />
-                    )}
+                <div className="flex items-center gap-3 p-3 bg-[#0B0F1A] rounded-lg">
+                  <div className="w-10 h-10 bg-[#6C5CE720] rounded flex items-center justify-center">
+                    <Upload size={16} className="text-[#6C5CE7]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[#E2E8F0] truncate">{videoFile.name}</p>
-                    <p className="text-[10px] text-[#8892A8]">{formatFileSize(videoFile.size)}</p>
+                    <p className="text-sm text-[#E2E8F0] truncate">{videoFile?.name}</p>
+                    <p className="text-xs text-[#8892A8]">{videoFile && (videoFile.size / (1024 * 1024)).toFixed(1)} MB</p>
                   </div>
-                  <button onClick={handleClearVideo} className="text-[#8892A8] hover:text-[#E2E8F0] shrink-0">
-                    <X size={14} />
+                  <button onClick={handleClearVideo} className="text-[#8892A8] hover:text-[#FF6B6B]">
+                    <X size={16} />
                   </button>
                 </div>
               )}
-              <input
-                ref={videoInputRef}
-                type="file"
-                accept="video/mp4,video/quicktime,video/webm"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoSelect(f) }}
-              />
             </div>
 
-            {/* Brand asset row */}
-            <div className="p-4 border-b border-[#2A3050]">
-              <p className="text-[10px] font-semibold text-[#8892A8] uppercase tracking-wider mb-2">Brand Asset</p>
+            {/* Brand Asset */}
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-4">
+              <h3 className="text-sm font-semibold text-[#E2E8F0] mb-3">Brand Asset</h3>
+              <input
+                ref={overlayInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleOverlaySelect(e.target.files[0])}
+              />
               {!overlayPreviewUrl ? (
-                <button
+                <div
                   onClick={() => overlayInputRef.current?.click()}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-dashed border-[#2A3050] hover:border-[#6C5CE7] hover:bg-[#6C5CE708] transition-colors text-left"
+                  className="h-24 border-2 border-dashed border-[#2A3050] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#6C5CE7] transition-colors"
                 >
-                  <ImageIcon size={16} className="text-[#8892A8] shrink-0" />
-                  <span className="text-xs text-[#8892A8]">Click to upload logo / asset</span>
-                </button>
+                  <ImageIcon size={20} className="text-[#8892A8] mb-1" />
+                  <span className="text-sm text-[#8892A8]">Upload PNG or JPG</span>
+                </div>
               ) : (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#131825]">
-                  <div className="w-10 h-7 bg-white rounded flex items-center justify-center p-0.5 shrink-0">
-                    <Image
-                      src={overlayPreviewUrl}
-                      alt="Brand asset"
-                      width={40}
-                      height={28}
-                      className="object-contain max-h-full"
-                    />
+                <div className="flex items-center gap-3 p-3 bg-[#0B0F1A] rounded-lg">
+                  <div className="w-12 h-12 bg-white rounded flex items-center justify-center overflow-hidden">
+                    <Image src={overlayPreviewUrl} alt="Overlay" width={48} height={48} className="object-contain w-auto h-auto max-w-full max-h-full" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-[#E2E8F0] truncate">
-                      {isPreloaded ? `${campaignBrand} Asset` : overlayFile?.name || "Brand Asset"}
+                    <p className="text-sm text-[#E2E8F0] truncate">
+                      {isFromCampaign ? `${campaignBrand} Asset` : overlayFile?.name}
                     </p>
-                    {isPreloaded && <p className="text-[10px] text-[#6C5CE7]">From campaign</p>}
+                    {isFromCampaign && <p className="text-xs text-[#8892A8]">Campaign asset</p>}
                   </div>
-                  {!isPreloaded && (
-                    <button onClick={handleClearOverlay} className="text-[#8892A8] hover:text-[#E2E8F0] shrink-0">
-                      <X size={14} />
+                  {!isFromCampaign && (
+                    <button onClick={handleClearOverlay} className="text-[#8892A8] hover:text-[#FF6B6B]">
+                      <X size={16} />
                     </button>
                   )}
                 </div>
               )}
-              <input
-                ref={overlayInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleOverlaySelect(f) }}
-              />
             </div>
 
             {/* Overlay Settings */}
-            <div className="p-4 flex-1 space-y-5">
-              <p className="text-[10px] font-semibold text-[#8892A8] uppercase tracking-wider">Overlay Settings</p>
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-4">
+              <h3 className="text-sm font-semibold text-[#E2E8F0] mb-3">Overlay Settings</h3>
 
               {/* Position Mode Toggle */}
-              <div>
-                <div className="flex items-center bg-[#131825] rounded-lg p-0.5 w-fit mb-3">
-                  <button
-                    onClick={() => setPositionMode("grid")}
-                    className={cn(
-                      "flex items-center gap-1.5 py-1.5 px-3 text-xs font-semibold rounded-md transition-all",
-                      positionMode === "grid" ? "bg-[#6C5CE7] text-white" : "text-[#8892A8] hover:text-[#E2E8F0]"
-                    )}
-                  >
-                    <Grid3X3 size={12} /> Grid
-                  </button>
-                  <button
-                    onClick={() => setPositionMode("advanced")}
-                    className={cn(
-                      "flex items-center gap-1.5 py-1.5 px-3 text-xs font-semibold rounded-md transition-all",
-                      positionMode === "advanced" ? "bg-[#6C5CE7] text-white" : "text-[#8892A8] hover:text-[#E2E8F0]"
-                    )}
-                  >
-                    <Settings2 size={12} /> Advanced
-                  </button>
-                </div>
-
-                {/* 3x3 Grid */}
-                {positionMode === "grid" && (
-                  <div>
-                    <div className="grid grid-cols-3 gap-1.5 w-28">
-                      {POSITION_GRID.flat().map((pos) => (
-                        <button
-                          key={pos}
-                          onClick={() => setPosition(pos)}
-                          className={cn(
-                            "w-8 h-8 rounded border-2 transition-colors",
-                            position === pos
-                              ? "bg-[#6C5CE7] border-[#6C5CE7]"
-                              : "bg-[#131825] border-[#2A3050] hover:border-[#6C5CE7]/50"
-                          )}
-                          aria-label={POSITION_LABELS[pos]}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-[#6C5CE7] mt-1.5 font-medium">{POSITION_LABELS[position]}</p>
-                  </div>
-                )}
-
-                {/* Advanced X/Y */}
-                {positionMode === "advanced" && (
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs text-[#8892A8]">X (from left)</label>
-                        <span className="text-xs font-mono text-[#E2E8F0]">{customX}%</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Slider
-                          value={[customX]}
-                          onValueChange={([v]) => setCustomX(v)}
-                          min={0} max={100} step={1}
-                          className="flex-1"
-                        />
-                        <Input
-                          type="number"
-                          value={customX}
-                          onChange={(e) => setCustomX(Math.min(100, Math.max(0, Number(e.target.value))))}
-                          className="w-14 h-7 text-xs bg-[#131825] border-[#2A3050] text-[#E2E8F0]"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs text-[#8892A8]">Y (from top)</label>
-                        <span className="text-xs font-mono text-[#E2E8F0]">{customY}%</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Slider
-                          value={[customY]}
-                          onValueChange={([v]) => setCustomY(v)}
-                          min={0} max={100} step={1}
-                          className="flex-1"
-                        />
-                        <Input
-                          type="number"
-                          value={customY}
-                          onChange={(e) => setCustomY(Math.min(100, Math.max(0, Number(e.target.value))))}
-                          className="w-14 h-7 text-xs bg-[#131825] border-[#2A3050] text-[#E2E8F0]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div className="flex gap-1 mb-3">
+                <button
+                  onClick={() => setPositionMode("grid")}
+                  className={cn(
+                    "flex-1 py-1.5 text-xs font-medium rounded transition-colors",
+                    positionMode === "grid" ? "bg-[#6C5CE7] text-white" : "bg-[#1A2035] text-[#8892A8] hover:text-[#E2E8F0]"
+                  )}
+                >
+                  Grid
+                </button>
+                <button
+                  onClick={() => setPositionMode("advanced")}
+                  className={cn(
+                    "flex-1 py-1.5 text-xs font-medium rounded transition-colors",
+                    positionMode === "advanced" ? "bg-[#6C5CE7] text-white" : "bg-[#1A2035] text-[#8892A8] hover:text-[#E2E8F0]"
+                  )}
+                >
+                  Advanced
+                </button>
               </div>
+
+              {positionMode === "grid" ? (
+                <div className="grid grid-cols-3 gap-1.5 mb-4">
+                  {POSITION_GRID.flat().map((pos) => (
+                    <button
+                      key={pos}
+                      onClick={() => setPosition(pos)}
+                      className={cn(
+                        "py-2 text-xs font-medium rounded transition-colors",
+                        position === pos ? "bg-[#6C5CE7] text-white" : "bg-[#1A2035] text-[#8892A8] hover:text-[#E2E8F0]"
+                      )}
+                    >
+                      {POSITION_LABELS[pos]}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3 mb-4">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-[#8892A8]">X Position</span>
+                      <Input
+                        type="number"
+                        value={customX}
+                        onChange={(e) => setCustomX(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-14 h-6 text-xs bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0] text-center"
+                      />
+                    </div>
+                    <Slider value={[customX]} onValueChange={([v]) => setCustomX(v)} max={100} step={1} />
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-[#8892A8]">Y Position</span>
+                      <Input
+                        type="number"
+                        value={customY}
+                        onChange={(e) => setCustomY(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-14 h-6 text-xs bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0] text-center"
+                      />
+                    </div>
+                    <Slider value={[customY]} onValueChange={([v]) => setCustomY(v)} max={100} step={1} />
+                  </div>
+                </div>
+              )}
 
               {/* Size */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-[#8892A8]">Size</label>
-                  <span className="text-xs font-mono text-[#E2E8F0]">{size}%</span>
+                <div className="flex justify-between mb-1">
+                  <span className="text-xs text-[#8892A8]">Size</span>
+                  <span className="text-xs text-[#E2E8F0]">{size}%</span>
                 </div>
-                <Slider
-                  value={[size]}
-                  onValueChange={([v]) => setSize(v)}
-                  min={5} max={80} step={1}
-                  className="w-full"
-                />
+                <Slider value={[size]} onValueChange={([v]) => setSize(v)} min={10} max={100} step={5} />
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Preview */}
+          <div className="lg:w-[45%]">
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050]">
+              <div className="px-4 py-3 border-b border-[#2A3050]">
+                <h3 className="text-sm font-semibold text-[#E2E8F0]">
+                  {processingState === "success" ? "Result" : "Preview"}
+                </h3>
+              </div>
+
+              <div className="p-4">
+                {/* Fixed aspect ratio container */}
+                <div className="relative w-full bg-[#0B0F1A] rounded-lg overflow-hidden" style={{ aspectRatio: "16/9" }}>
+                  {/* Idle - no video */}
+                  {processingState !== "success" && !videoPreviewUrl && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-[#8892A8]">
+                      <Upload size={28} className="mb-2 opacity-50" />
+                      <p className="text-sm">Upload a video to preview</p>
+                    </div>
+                  )}
+
+                  {/* Video preview */}
+                  {processingState !== "success" && videoPreviewUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <video
+                        ref={previewVideoRef}
+                        src={videoPreviewUrl}
+                        className="max-w-full max-h-full object-contain"
+                        controls={processingState === "idle"}
+                        muted
+                        onLoadedMetadata={handleVideoMetadata}
+                      />
+                      {overlayImage && videoDimensions && processingState === "idle" && (
+                        <div className="absolute pointer-events-none" style={getPreviewOverlayStyles()}>
+                          <Image src={overlayPreviewUrl || ""} alt="Overlay" width={200} height={100} className="w-full h-auto" />
+                        </div>
+                      )}
+                      {/* Processing overlay */}
+                      {processingState === "processing" && (
+                        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
+                          <Loader2 size={32} className="text-[#6C5CE7] animate-spin mb-3" />
+                          <p className="text-sm text-white mb-2">Processing...</p>
+                          <div className="w-32 h-1.5 bg-[#2A3050] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#6C5CE7] transition-all" style={{ width: `${processingProgress}%` }} />
+                          </div>
+                          <p className="text-xs text-[#8892A8] mt-1">{processingProgress}%</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Success result */}
+                  {processingState === "success" && resultUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <video src={resultUrl} className="max-w-full max-h-full object-contain" controls autoPlay />
+                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-[#00B89490] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                        <CheckCircle2 size={12} />
+                        Done
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error state */}
+                  {processingState === "error" && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <AlertCircle size={28} className="text-[#FF6B6B] mb-2" />
+                      <p className="text-sm text-[#E2E8F0] mb-1">Failed</p>
+                      <p className="text-xs text-[#8892A8] text-center px-4">{errorMessage}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                {processingState === "success" && (
+                  <div className="mt-4 space-y-2">
+                    <Button onClick={handleDownload} className="w-full bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white">
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                    <Button onClick={handlePublish} className="w-full bg-[#00B894] hover:bg-[#00a383] text-white">
+                      <Send className="mr-2 h-4 w-4" />
+                      Publish (@YourChannelName)
+                    </Button>
+                  </div>
+                )}
+
+                {processingState === "error" && (
+                  <div className="mt-4">
+                    <Button onClick={() => setProcessingState("idle")} variant="outline" className="w-full border-[#2A3050] text-[#8892A8]">
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Try Again
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -738,8 +653,8 @@ function VideoStudioContent() {
 export default function VideoStudioPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen bg-[#0B0F1A] dark items-center justify-center">
-        <Loader2 size={32} className="text-[#6C5CE7] animate-spin" />
+      <div className="flex min-h-screen bg-[#0B0F1A] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#6C5CE7]" />
       </div>
     }>
       <VideoStudioContent />
