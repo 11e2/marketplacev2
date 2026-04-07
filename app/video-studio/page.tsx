@@ -760,7 +760,7 @@ function VideoStudioContent() {
                   </h2>
                 </div>
 
-                <div className="p-5">
+                <div className="p-5 max-h-[600px] overflow-y-auto">
                   {/* Idle state */}
                   {processingState === "idle" && !videoPreviewUrl && (
                     <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center text-[#8892A8]">
