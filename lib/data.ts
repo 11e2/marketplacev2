@@ -1,4 +1,6 @@
-export const campaigns = [
+import type { Campaign } from "./types"
+
+export const campaigns: Campaign[] = [
   {
     id: 1,
     brand: "NordVPN",
@@ -65,11 +67,11 @@ export const campaigns = [
     brandInitial: "A",
     brandColor: "#FF9F43",
     verified: true,
-    rate: "20% rev",
-    rateType: "affiliate",
-    title: "Podcast Ad Read + Affiliate: Health & Wellness",
-    description: "Pre-roll and mid-roll ad reads for health, fitness, and lifestyle podcasts. Affiliate commission on top of flat fee.",
-    channels: ["Podcast", "Affiliate"],
+    rate: "$400/read",
+    rateType: "flat",
+    title: "Podcast Ad Read: Health & Wellness",
+    description: "Pre-roll and mid-roll ad reads for health, fitness, and lifestyle podcasts. Natural integration preferred.",
+    channels: ["Podcast"],
     budget: "$15,000",
     spots: 8,
     accentColor: "#FF9F43",
@@ -101,7 +103,6 @@ export const channelColors: Record<string, string> = {
   "Podcast": "#FF9F43",
   "Twitch": "#9146FF",
   "Instagram": "#E91E8C",
-  "Affiliate": "#00B894",
   "Shorts": "#FF4444",
   "Reddit": "#FF5700",
   "Telegram": "#26A5E4",
@@ -124,10 +125,10 @@ export const tickerItems = [
   { text: "Creator earned $200 for a Discord sponsorship" },
   { text: "Brand launched a 12-creator TikTok campaign" },
   { text: "Creator earned $500 for a YouTube preroll" },
-  { text: "New affiliate deal closed: $1,200/month" },
+  { text: "New clipping deal closed: $1,200/month" },
   { text: "Creator earned $350 for a Twitter/X thread series" },
   { text: "Brand reached 2.4M impressions via newsletter" },
-  { text: "Podcast mid-roll deal: $500 + 15% affiliate" },
+  { text: "Podcast mid-roll deal: $500 flat rate" },
   { text: "Discord server sponsor earned $900 this week" },
 ]
 
@@ -167,12 +168,6 @@ export const channelCategories = [
     accentColor: "#FF9F43",
     channels: ["Podcast Pre-Roll", "Mid-Roll", "Post-Roll", "Dedicated Episode"],
     dealVolume: "$780K",
-  },
-  {
-    name: "Affiliate",
-    accentColor: "#00B894",
-    channels: ["Tracking Links", "Discount Codes", "Rev Share", "CPA"],
-    dealVolume: "$3.2M",
   },
   {
     name: "Custom",
@@ -258,41 +253,48 @@ export const recentSubmissions = [
     campaign: "Podcast Health",
     channel: "Podcast",
     status: "Pending",
-    reach: "—",
+    reach: "-",
   },
 ]
 
 export const earningsData = [
-  { date: "Mar 8", deals: 180, affiliate: 40, clipping: 20 },
-  { date: "Mar 10", deals: 220, affiliate: 55, clipping: 35 },
-  { date: "Mar 12", deals: 160, affiliate: 30, clipping: 25 },
-  { date: "Mar 14", deals: 300, affiliate: 80, clipping: 45 },
-  { date: "Mar 16", deals: 250, affiliate: 60, clipping: 30 },
-  { date: "Mar 18", deals: 180, affiliate: 45, clipping: 20 },
-  { date: "Mar 20", deals: 420, affiliate: 100, clipping: 60 },
-  { date: "Mar 22", deals: 380, affiliate: 90, clipping: 50 },
-  { date: "Mar 24", deals: 290, affiliate: 70, clipping: 40 },
-  { date: "Mar 26", deals: 350, affiliate: 85, clipping: 45 },
-  { date: "Mar 28", deals: 460, affiliate: 120, clipping: 70 },
-  { date: "Mar 30", deals: 410, affiliate: 100, clipping: 55 },
-  { date: "Apr 1", deals: 500, affiliate: 130, clipping: 80 },
-  { date: "Apr 3", deals: 380, affiliate: 95, clipping: 50 },
-  { date: "Apr 5", deals: 520, affiliate: 140, clipping: 90 },
+  { date: "Mar 8", deals: 180, clipping: 60 },
+  { date: "Mar 10", deals: 220, clipping: 90 },
+  { date: "Mar 12", deals: 160, clipping: 55 },
+  { date: "Mar 14", deals: 300, clipping: 125 },
+  { date: "Mar 16", deals: 250, clipping: 90 },
+  { date: "Mar 18", deals: 180, clipping: 65 },
+  { date: "Mar 20", deals: 420, clipping: 160 },
+  { date: "Mar 22", deals: 380, clipping: 140 },
+  { date: "Mar 24", deals: 290, clipping: 110 },
+  { date: "Mar 26", deals: 350, clipping: 130 },
+  { date: "Mar 28", deals: 460, clipping: 190 },
+  { date: "Mar 30", deals: 410, clipping: 155 },
+  { date: "Apr 1", deals: 500, clipping: 210 },
+  { date: "Apr 3", deals: 380, clipping: 145 },
+  { date: "Apr 5", deals: 520, clipping: 230 },
 ]
 
 export const channelBreakdown = [
-  { name: "TikTok", value: 42, color: "#6C5CE7" },
-  { name: "Discord", value: 23, color: "#4ECDC4" },
-  { name: "YouTube", value: 18, color: "#FF4444" },
-  { name: "Affiliate", value: 12, color: "#00B894" },
-  { name: "Other", value: 5, color: "#64748B" },
+  { name: "TikTok", value: 45, color: "#6C5CE7" },
+  { name: "Discord", value: 25, color: "#4ECDC4" },
+  { name: "YouTube", value: 20, color: "#FF4444" },
+  { name: "Other", value: 10, color: "#64748B" },
 ]
 
 export const transactions = [
   { date: "Apr 5", description: "NordVPN TikTok Campaign", channel: "TikTok", type: "Earning", amount: "+$150.00", status: "Paid" },
-  { date: "Apr 4", description: "Affiliate Commission — Athletic Greens", channel: "Affiliate", type: "Commission", amount: "+$43.20", status: "Paid" },
-  { date: "Apr 2", description: "Discord Server Sponsorship — DeFi X", channel: "Discord", type: "Earning", amount: "+$75.00", status: "Paid" },
-  { date: "Apr 1", description: "Biweekly Payout", channel: "—", type: "Payout", amount: "-$1,200.00", status: "Sent" },
-  { date: "Mar 30", description: "YouTube Preroll — Raid Shadow", channel: "YouTube", type: "Earning", amount: "+$600.00", status: "Paid" },
-  { date: "Mar 28", description: "Newsletter Placement — Morning Brew", channel: "Newsletter", type: "Earning", amount: "+$500.00", status: "Paid" },
+  { date: "Apr 4", description: "Clipping Revenue - Athletic Greens", channel: "TikTok", type: "Earning", amount: "+$43.20", status: "Paid" },
+  { date: "Apr 2", description: "Discord Server Sponsorship - DeFi X", channel: "Discord", type: "Earning", amount: "+$75.00", status: "Paid" },
+  { date: "Apr 1", description: "Biweekly Payout", channel: "-", type: "Payout", amount: "-$1,200.00", status: "Sent" },
+  { date: "Mar 30", description: "YouTube Preroll - Raid Shadow", channel: "YouTube", type: "Earning", amount: "+$600.00", status: "Paid" },
+  { date: "Mar 28", description: "Newsletter Placement - Morning Brew", channel: "Newsletter", type: "Earning", amount: "+$500.00", status: "Paid" },
 ]
+
+export function getCampaignById(id: number): Campaign | undefined {
+  return campaigns.find((c) => c.id === id)
+}
+
+export function getCampaignsByChannel(channel: string): Campaign[] {
+  return campaigns.filter((c) => c.channels.some((ch) => ch.toLowerCase().includes(channel.toLowerCase())))
+}

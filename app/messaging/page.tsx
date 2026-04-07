@@ -1,9 +1,19 @@
 "use client"
 
 import { useState } from "react"
-import { Send, Paperclip, Smile, Check, CheckCheck, Clock, ChevronDown } from "lucide-react"
+import { Send, Paperclip, Smile, Check, CheckCheck, Clock } from "lucide-react"
+import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ChannelChip, StatusPill } from "@/components/channel-chip"
+
+interface Message {
+  id: number
+  from: string
+  text?: string
+  time: string
+  read: boolean
+  isProposal?: boolean
+}
 
 const conversations = [
   {
@@ -31,7 +41,7 @@ const conversations = [
     name: "Athletic Greens",
     initial: "A",
     color: "#FF9F43",
-    preview: "Can you include a 10% discount code?",
+    preview: "Can you record the ad read by Friday?",
     time: "3h ago",
     unread: 1,
     type: "Negotiation",
@@ -48,43 +58,41 @@ const conversations = [
   },
 ]
 
-const messages = [
-  {
-    id: 1,
-    from: "brand",
-    text: "Hi Alex! We love your content. We'd like to offer you a TikTok product demo for our Summer Campaign.",
-    time: "2:14 PM",
-    read: true,
-  },
-  {
-    id: 2,
-    from: "me",
-    text: "Thanks for reaching out! I'd be happy to do a product demo. Could you share more details about the creative brief?",
-    time: "2:31 PM",
-    read: true,
-  },
-  {
-    id: 3,
-    from: "brand",
-    text: "Of course! We're looking for a 30-60s natural integration. We're offering $150 for the post.",
-    time: "2:35 PM",
-    read: true,
-  },
-  {
-    id: 4,
-    from: "me",
-    text: "That sounds great. Given my 8.4% engagement rate and 385K followers, I typically charge $200 for a 30-60s product demo. Would that work for your budget?",
-    time: "2:48 PM",
-    read: true,
-  },
-  {
-    id: 5,
-    from: "brand",
-    isProposal: true,
-    time: "3:02 PM",
-    read: false,
-  },
-]
+const threadsByConvo: Record<number, Message[]> = {
+  1: [
+    { id: 1, from: "brand", text: "Hi Alex! We love your content. We'd like to offer you a TikTok product demo for our Summer Campaign.", time: "2:14 PM", read: true },
+    { id: 2, from: "me", text: "Thanks for reaching out! I'd be happy to do a product demo. Could you share more details about the creative brief?", time: "2:31 PM", read: true },
+    { id: 3, from: "brand", text: "Of course! We're looking for a 30-60s natural integration. We're offering $150 for the post.", time: "2:35 PM", read: true },
+    { id: 4, from: "me", text: "That sounds great. Given my 8.4% engagement rate and 385K followers, I typically charge $200 for a 30-60s product demo. Would that work for your budget?", time: "2:48 PM", read: true },
+    { id: 5, from: "brand", isProposal: true, time: "3:02 PM", read: false },
+  ],
+  2: [
+    { id: 1, from: "brand", text: "Hi Alex, we'd love to partner on a Twitter/X thread series about e-commerce tips.", time: "10:00 AM", read: true },
+    { id: 2, from: "me", text: "I'd be interested! I have a lot of experience with e-commerce content. What's the scope?", time: "10:15 AM", read: true },
+    { id: 3, from: "brand", text: "5-7 tweet thread, $300 flat rate. We'll provide key talking points but want your authentic voice.", time: "10:22 AM", read: true },
+    { id: 4, from: "me", text: "That works for me. I'll draft something and send it over for review by Wednesday.", time: "10:30 AM", read: true },
+    { id: 5, from: "brand", text: "The thread looks great. Approved for publishing. Go ahead whenever you're ready!", time: "Yesterday", read: true },
+  ],
+  3: [
+    { id: 1, from: "brand", text: "Hey Alex, we loved your podcast demo. Want to do a dedicated pre-roll for our new product line?", time: "9:00 AM", read: true },
+    { id: 2, from: "me", text: "Absolutely! I've been using AG for a while so it would be very natural. What's the rate?", time: "9:20 AM", read: true },
+    { id: 3, from: "brand", text: "$400 for a 30s pre-roll read. Can you record the ad read by Friday?", time: "9:35 AM", read: false },
+  ],
+  4: [
+    { id: 1, from: "brand", text: "Hi Alex, we have a newsletter sponsorship slot opening next Tuesday. Interested?", time: "Mon 3:00 PM", read: true },
+    { id: 2, from: "me", text: "Yes! My newsletter has 22K subscribers in the gaming/tech niche. What's the format?", time: "Mon 3:15 PM", read: true },
+    { id: 3, from: "brand", text: "Full sponsored section, $500 flat. We'll send the copy and you can adjust tone.", time: "Mon 3:30 PM", read: true },
+    { id: 4, from: "me", text: "Deal. Send the copy over and I'll have it ready for Tuesday.", time: "Mon 3:45 PM", read: true },
+    { id: 5, from: "brand", text: "Newsletter slot confirmed for next Tuesday. Copy is in your inbox.", time: "Yesterday", read: true },
+  ],
+}
+
+const convoContext: Record<number, { campaign: string; brand: string; channel: string }> = {
+  1: { campaign: "TikTok Product Demo", brand: "NordVPN - Summer Campaign", channel: "TikTok" },
+  2: { campaign: "Twitter/X Thread Series", brand: "Shopify - E-commerce Tips", channel: "Twitter/X" },
+  3: { campaign: "Podcast Pre-Roll", brand: "Athletic Greens - Health Line", channel: "Podcast" },
+  4: { campaign: "Newsletter Sponsorship", brand: "Morning Brew - Finance Niche", channel: "Newsletter" },
+}
 
 const negotiationHistory = [
   { label: "Initial Offer", amount: "$150", by: "NordVPN", time: "2:35 PM", color: "#8892A8" },
@@ -95,7 +103,43 @@ const negotiationHistory = [
 export default function MessagingPage() {
   const [activeConvo, setActiveConvo] = useState(1)
   const [activeTab, setActiveTab] = useState("All")
-  const [message, setMessage] = useState("")
+  const [messageInput, setMessageInput] = useState("")
+  const [threads, setThreads] = useState(threadsByConvo)
+  const [proposalStatus, setProposalStatus] = useState<"pending" | "accepted" | "countered" | "declined">("pending")
+
+  const currentMessages = threads[activeConvo] ?? []
+  const ctx = convoContext[activeConvo]
+  const activeConvoData = conversations.find((c) => c.id === activeConvo)
+
+  const sendMessage = () => {
+    if (!messageInput.trim()) return
+    const newMsg: Message = {
+      id: Date.now(),
+      from: "me",
+      text: messageInput.trim(),
+      time: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      read: false,
+    }
+    setThreads((prev) => ({
+      ...prev,
+      [activeConvo]: [...(prev[activeConvo] ?? []), newMsg],
+    }))
+    setMessageInput("")
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
+  const handleProposalAction = (action: "accepted" | "countered" | "declined") => {
+    setProposalStatus(action)
+    const labels = { accepted: "Proposal accepted!", countered: "Counter-offer sent!", declined: "Proposal declined" }
+    const toastFn = action === "accepted" ? toast.success : action === "declined" ? toast.error : toast.info
+    toastFn(labels[action])
+  }
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex overflow-hidden" style={{ height: "100vh" }}>
@@ -127,7 +171,10 @@ export default function MessagingPage() {
             {conversations.map((c) => (
               <button
                 key={c.id}
-                onClick={() => setActiveConvo(c.id)}
+                onClick={() => {
+                  setActiveConvo(c.id)
+                  if (c.id !== 1) setProposalStatus("pending")
+                }}
                 className="w-full px-4 py-3 flex items-start gap-3 border-b border-[#2A3050] text-left transition-colors"
                 style={
                   activeConvo === c.id
@@ -162,22 +209,25 @@ export default function MessagingPage() {
         <div className="flex-1 min-w-0 flex flex-col bg-[#0B0F1A]">
           {/* Thread header */}
           <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#2A3050] bg-[#131825]">
-            <div className="w-8 h-8 rounded-full bg-[#6C5CE7] flex items-center justify-center text-white text-xs font-bold">
-              N
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+              style={{ backgroundColor: activeConvoData?.color ?? "#6C5CE7" }}
+            >
+              {activeConvoData?.initial ?? "?"}
             </div>
             <div>
-              <p className="text-sm font-bold text-[#E2E8F0]">NordVPN</p>
+              <p className="text-sm font-bold text-[#E2E8F0]">{activeConvoData?.name}</p>
               <p className="text-[10px] text-[#00B894]">Online now</p>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <ChannelChip channel="TikTok" />
-              <span className="text-xs text-[#8892A8]">Summer Campaign</span>
+              {ctx && <ChannelChip channel={ctx.channel} />}
+              <span className="text-xs text-[#8892A8]">{ctx?.campaign}</span>
             </div>
           </div>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-            {messages.map((msg) => {
+            {currentMessages.map((msg) => {
               if (msg.isProposal) {
                 return (
                   <div key={msg.id} className="flex justify-start">
@@ -186,6 +236,17 @@ export default function MessagingPage() {
                         <div className="px-4 py-3 border-b border-[#2A3050] flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-[#6C5CE7]" />
                           <span className="text-xs font-bold text-[#E2E8F0]">Negotiation Proposal</span>
+                          {proposalStatus !== "pending" && (
+                            <span
+                              className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                              style={{
+                                backgroundColor: proposalStatus === "accepted" ? "#00B89420" : proposalStatus === "declined" ? "#FF6B6B20" : "#FF9F4320",
+                                color: proposalStatus === "accepted" ? "#00B894" : proposalStatus === "declined" ? "#FF6B6B" : "#FF9F43",
+                              }}
+                            >
+                              {proposalStatus}
+                            </span>
+                          )}
                         </div>
                         <div className="p-4 space-y-2.5">
                           <div className="flex justify-between text-xs">
@@ -204,17 +265,19 @@ export default function MessagingPage() {
                             <span className="text-[#8892A8]">Escrow</span>
                             <span className="font-bold font-mono text-[#00B894]">$200 held</span>
                           </div>
-                          <div className="flex gap-2 pt-2">
-                            <button className="flex-1 py-2 rounded-lg bg-[#00B894] text-white text-xs font-bold hover:bg-[#009b7e] transition-colors">
-                              Accept
-                            </button>
-                            <button className="flex-1 py-2 rounded-lg border border-[#FF9F43] text-[#FF9F43] text-xs font-bold hover:bg-[#FF9F4315] transition-colors">
-                              Counter
-                            </button>
-                            <button className="flex-1 py-2 rounded-lg border border-[#FF6B6B] text-[#FF6B6B] text-xs font-bold hover:bg-[#FF6B6B15] transition-colors">
-                              Decline
-                            </button>
-                          </div>
+                          {proposalStatus === "pending" && (
+                            <div className="flex gap-2 pt-2">
+                              <button onClick={() => handleProposalAction("accepted")} className="flex-1 py-2 rounded-lg bg-[#00B894] text-white text-xs font-bold hover:bg-[#009b7e] transition-colors">
+                                Accept
+                              </button>
+                              <button onClick={() => handleProposalAction("countered")} className="flex-1 py-2 rounded-lg border border-[#FF9F43] text-[#FF9F43] text-xs font-bold hover:bg-[#FF9F4315] transition-colors">
+                                Counter
+                              </button>
+                              <button onClick={() => handleProposalAction("declined")} className="flex-1 py-2 rounded-lg border border-[#FF6B6B] text-[#FF6B6B] text-xs font-bold hover:bg-[#FF6B6B15] transition-colors">
+                                Decline
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1 mt-1 ml-1">
@@ -256,26 +319,34 @@ export default function MessagingPage() {
           {/* Input */}
           <div className="px-5 py-4 border-t border-[#2A3050] bg-[#131825]">
             <div className="flex items-center gap-3">
-              <button className="text-[#8892A8] hover:text-[#E2E8F0] transition-colors">
+              <button
+                onClick={() => toast.info("File picker coming soon")}
+                className="text-[#8892A8] hover:text-[#E2E8F0] transition-colors"
+              >
                 <Paperclip size={18} />
               </button>
-              <button className="text-[#8892A8] hover:text-[#E2E8F0] transition-colors">
+              <button
+                onClick={() => toast.info("Emoji picker coming soon")}
+                className="text-[#8892A8] hover:text-[#E2E8F0] transition-colors"
+              >
                 <Smile size={18} />
               </button>
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Message NordVPN... (type /templates for quick replies)"
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={`Message ${activeConvoData?.name ?? ""}...`}
                   className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-xl px-4 py-2.5 text-sm text-[#E2E8F0] placeholder-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
                 />
               </div>
               <button
+                onClick={sendMessage}
                 className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
-                style={{ backgroundColor: message ? "#6C5CE7" : "#1A2035" }}
+                style={{ backgroundColor: messageInput ? "#6C5CE7" : "#1A2035" }}
               >
-                <Send size={16} style={{ color: message ? "#fff" : "#8892A8" }} />
+                <Send size={16} style={{ color: messageInput ? "#fff" : "#8892A8" }} />
               </button>
             </div>
           </div>
@@ -286,67 +357,71 @@ export default function MessagingPage() {
           <div className="px-4 py-4 border-b border-[#2A3050]">
             <h2 className="text-xs font-bold text-[#8892A8] uppercase tracking-widest mb-3">Deal Context</h2>
 
-            {/* Campaign info */}
-            <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3 mb-3">
-              <p className="text-xs font-bold text-[#E2E8F0] mb-1">TikTok Product Demo</p>
-              <p className="text-[11px] text-[#8892A8]">NordVPN · Summer Campaign</p>
-              <div className="flex items-center gap-2 mt-2">
-                <ChannelChip channel="TikTok" />
-                <StatusPill status="Pending" />
-              </div>
-            </div>
-
-            {/* Creator mini-card */}
-            <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3 mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-[#6C5CE7] flex items-center justify-center text-white text-xs font-bold">
-                  AK
+            {ctx && (
+              <>
+                <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3 mb-3">
+                  <p className="text-xs font-bold text-[#E2E8F0] mb-1">{ctx.campaign}</p>
+                  <p className="text-[11px] text-[#8892A8]">{ctx.brand}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <ChannelChip channel={ctx.channel} />
+                    <StatusPill status="Pending" />
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-[#E2E8F0]">Alex Kowalski</p>
-                  <p className="text-[10px] text-[#8892A8]">385K TikTok · 8.4% eng.</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Negotiation history */}
-          <div className="px-4 py-4 border-b border-[#2A3050]">
-            <h2 className="text-xs font-bold text-[#8892A8] uppercase tracking-widest mb-3">Negotiation History</h2>
-            <div className="relative pl-4">
-              <div className="absolute left-1.5 top-2 bottom-2 w-px bg-[#2A3050]" />
-              <div className="space-y-4">
-                {negotiationHistory.map((h, i) => (
-                  <div key={i} className="relative">
-                    <div
-                      className="absolute -left-[11px] top-1 w-2.5 h-2.5 rounded-full border-2"
-                      style={{ borderColor: h.color, backgroundColor: "#131825" }}
-                    />
-                    <p className="text-[11px] font-semibold text-[#E2E8F0]">{h.label}</p>
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] text-[#8892A8]">{h.by} · {h.time}</p>
-                      <span className="text-[11px] font-bold font-mono" style={{ color: h.color }}>{h.amount}</span>
+                <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#6C5CE7] flex items-center justify-center text-white text-xs font-bold">
+                      AK
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-[#E2E8F0]">Alex Kowalski</p>
+                      <p className="text-[10px] text-[#8892A8]">385K TikTok - 8.4% eng.</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Escrow */}
-          <div className="px-4 py-4">
-            <h2 className="text-xs font-bold text-[#8892A8] uppercase tracking-widest mb-3">Escrow</h2>
-            <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-[#8892A8]">Amount Held</span>
-                <span className="text-sm font-bold font-mono text-[#00B894]">$200.00</span>
+          {activeConvo === 1 && (
+            <>
+              <div className="px-4 py-4 border-b border-[#2A3050]">
+                <h2 className="text-xs font-bold text-[#8892A8] uppercase tracking-widest mb-3">Negotiation History</h2>
+                <div className="relative pl-4">
+                  <div className="absolute left-1.5 top-2 bottom-2 w-px bg-[#2A3050]" />
+                  <div className="space-y-4">
+                    {negotiationHistory.map((h, i) => (
+                      <div key={i} className="relative">
+                        <div
+                          className="absolute -left-[11px] top-1 w-2.5 h-2.5 rounded-full border-2"
+                          style={{ borderColor: h.color, backgroundColor: "#131825" }}
+                        />
+                        <p className="text-[11px] font-semibold text-[#E2E8F0]">{h.label}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-[#8892A8]">{h.by} - {h.time}</p>
+                          <span className="text-[11px] font-bold font-mono" style={{ color: h.color }}>{h.amount}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-[#00B894]">
-                <Clock size={10} />
-                Releases upon delivery approval
+
+              <div className="px-4 py-4">
+                <h2 className="text-xs font-bold text-[#8892A8] uppercase tracking-widest mb-3">Escrow</h2>
+                <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-[#8892A8]">Amount Held</span>
+                    <span className="text-sm font-bold font-mono text-[#00B894]">$200.00</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-[#00B894]">
+                    <Clock size={10} />
+                    Releases upon delivery approval
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ import {
   Store,
   Layers,
   Handshake,
-  Share2,
+  Video,
   MessageSquare,
   BarChart2,
   Wallet,
@@ -16,9 +16,9 @@ import { cn } from "@/lib/utils"
 
 const creatorNav = [
   { label: "Marketplace", href: "/marketplace", icon: Store },
-  { label: "My Services", href: "/profile", icon: Layers },
+  { label: "My Services", href: "/services", icon: Layers },
   { label: "Active Deals", href: "/messaging", icon: Handshake },
-  { label: "Affiliates", href: "/affiliates", icon: Share2 },
+  { label: "Video Studio", href: "/video-studio", icon: Video },
   { label: "Messages", href: "/messaging", icon: MessageSquare },
   { label: "Analytics", href: "/analytics", icon: BarChart2 },
   { label: "Payouts", href: "/earnings", icon: Wallet },
@@ -26,11 +26,11 @@ const creatorNav = [
 
 const brandNav = [
   { label: "Dashboard", href: "/dashboard", icon: BarChart2 },
-  { label: "Campaigns", href: "/campaigns", icon: Layers },
+  { label: "Campaigns", href: "/coming-soon", icon: Layers },
   { label: "New Campaign", href: "/campaign-builder", icon: TrendingUp },
   { label: "Creators", href: "/marketplace", icon: Store },
   { label: "Messages", href: "/messaging", icon: MessageSquare },
-  { label: "Payouts", href: "/payouts", icon: Wallet },
+  { label: "Payouts", href: "/coming-soon", icon: Wallet },
 ]
 
 interface SidebarNavProps {
