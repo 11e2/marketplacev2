@@ -6,23 +6,26 @@ import { execFile } from "child_process"
 import { randomUUID } from "crypto"
 
 // Dynamically resolve FFmpeg and FFprobe paths
-let FFMPEG_PATH: string | null = null
-let FFPROBE_PATH: string | null = null
-
-try {
-  const ffmpegStatic = require("ffmpeg-static")
-  FFMPEG_PATH = ffmpegStatic
-} catch {
-  FFMPEG_PATH = null
+// Try static packages first, then fall back to system binaries
+function resolveBinaryPath(staticPackage: string, systemCommand: string): string | null {
+  // Try the static package
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const staticPath = require(staticPackage)
+    const resolvedPath = typeof staticPath === "string" ? staticPath : staticPath?.path
+    if (resolvedPath && existsSync(resolvedPath)) {
+      return resolvedPath
+    }
+  } catch {
+    // Static package not available
+  }
+  
+  // Fall back to system binary (works when ffmpeg is installed globally)
+  return systemCommand
 }
 
-try {
-  const ffprobeStatic = require("ffprobe-static")
-  // ffprobe-static exports an object with a `path` property in v3.1.0
-  FFPROBE_PATH = typeof ffprobeStatic === "string" ? ffprobeStatic : ffprobeStatic.path
-} catch {
-  FFPROBE_PATH = null
-}
+const FFMPEG_PATH = resolveBinaryPath("ffmpeg-static", "ffmpeg")
+const FFPROBE_PATH = resolveBinaryPath("ffprobe-static", "ffprobe")
 
 const TEMP_DIR = "/tmp/marketingplace"
 const FFMPEG_TIMEOUT = 120_000
@@ -117,39 +120,37 @@ async function cleanupFiles(...paths: string[]) {
   )
 }
 
-export async function POST(request: Request) {
-  // Debug: Log binary paths
-  console.log("[v0] FFMPEG_PATH:", FFMPEG_PATH)
-  console.log("[v0] FFPROBE_PATH:", FFPROBE_PATH)
-  console.log("[v0] FFMPEG exists:", FFMPEG_PATH ? existsSync(FFMPEG_PATH) : false)
-  console.log("[v0] FFPROBE exists:", FFPROBE_PATH ? existsSync(FFPROBE_PATH) : false)
+// Helper to check if a binary is available (either as a file path or system command)
+async function isBinaryAvailable(binaryPath: string | null): Promise<boolean> {
+  if (!binaryPath) return false
+  
+  // If it's an absolute path, check if file exists
+  if (binaryPath.startsWith("/")) {
+    return existsSync(binaryPath)
+  }
+  
+  // Otherwise, try to run it with --version to check if it's a valid system command
+  return new Promise((resolve) => {
+    execFile(binaryPath, ["-version"], { timeout: 5000 }, (error) => {
+      resolve(!error)
+    })
+  })
+}
 
-  // Check FFmpeg availability
-  if (!FFMPEG_PATH) {
-    console.error("[v0] FFmpeg not found - ffmpeg-static package failed to load")
+export async function POST(request: Request) {
+  // Check FFmpeg availability at runtime
+  const ffmpegAvailable = await isBinaryAvailable(FFMPEG_PATH)
+  const ffprobeAvailable = await isBinaryAvailable(FFPROBE_PATH)
+
+  if (!ffmpegAvailable) {
     return NextResponse.json(
-      { error: "FFmpeg package failed to load" },
+      { error: "FFmpeg is not available. Please deploy to Vercel or install FFmpeg locally." },
       { status: 500 }
     )
   }
-  if (!existsSync(FFMPEG_PATH)) {
-    console.error("[v0] FFmpeg binary not found at:", FFMPEG_PATH)
+  if (!ffprobeAvailable) {
     return NextResponse.json(
-      { error: `FFmpeg binary not found at ${FFMPEG_PATH}` },
-      { status: 500 }
-    )
-  }
-  if (!FFPROBE_PATH) {
-    console.error("[v0] FFprobe not found - ffprobe-static package failed to load")
-    return NextResponse.json(
-      { error: "FFprobe package failed to load" },
-      { status: 500 }
-    )
-  }
-  if (!existsSync(FFPROBE_PATH)) {
-    console.error("[v0] FFprobe binary not found at:", FFPROBE_PATH)
-    return NextResponse.json(
-      { error: `FFprobe binary not found at ${FFPROBE_PATH}` },
+      { error: "FFprobe is not available. Please deploy to Vercel or install FFmpeg locally." },
       { status: 500 }
     )
   }
