@@ -13,11 +13,20 @@ import {
   Cell,
 } from "recharts"
 import { ArrowDownToLine, Wallet, TrendingUp, Clock } from "lucide-react"
+import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ChannelChip, StatusPill } from "@/components/channel-chip"
 import { earningsData, channelBreakdown, transactions } from "@/lib/data"
 
 const timeRanges = ["7d", "30d", "90d", "12m", "All"]
+
+const earningsDataByRange: Record<string, typeof earningsData> = {
+  "7d": earningsData.slice(-5),
+  "30d": earningsData,
+  "90d": earningsData,
+  "12m": earningsData,
+  "All": earningsData,
+}
 
 const CustomTooltip = ({
   active,
@@ -64,8 +73,23 @@ const PieTooltip = ({ active, payload }: { active?: boolean; payload?: { name: s
   return null
 }
 
+function exportCSV() {
+  const headers = ["Date", "Description", "Channel", "Type", "Amount", "Status"]
+  const rows = transactions.map((t) => [t.date, t.description, t.channel, t.type, t.amount, t.status])
+  const csvContent = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = "transactions.csv"
+  link.click()
+  URL.revokeObjectURL(url)
+  toast.success("CSV downloaded!")
+}
+
 export default function EarningsPage() {
   const [activeRange, setActiveRange] = useState("30d")
+  const chartData = earningsDataByRange[activeRange]
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
@@ -76,9 +100,12 @@ export default function EarningsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-bold text-[#E2E8F0]">Earnings & Payouts</h1>
-            <p className="text-sm text-[#8892A8]">Your financial overview · April 2026</p>
+            <p className="text-sm text-[#8892A8]">Your financial overview - April 2026</p>
           </div>
-          <button className="bg-[#FF6B35] hover:bg-[#e55a25] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
+          <button
+            onClick={() => toast.info("Withdrawal modal coming soon")}
+            className="bg-[#FF6B35] hover:bg-[#e55a25] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2"
+          >
             <ArrowDownToLine size={14} />
             Withdraw
           </button>
@@ -92,7 +119,10 @@ export default function EarningsPage() {
               <p className="text-xs font-semibold text-[#8892A8] uppercase tracking-widest">Available Balance</p>
             </div>
             <p className="text-4xl font-bold font-mono text-[#00B894]">$4,280.50</p>
-            <button className="mt-4 w-full bg-[#00B894] hover:bg-[#009b7e] text-white text-sm font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+            <button
+              onClick={() => toast.info("Withdrawal modal coming soon")}
+              className="mt-4 w-full bg-[#00B894] hover:bg-[#009b7e] text-white text-sm font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
               <ArrowDownToLine size={14} />
               Withdraw $4,280.50
             </button>
@@ -123,7 +153,6 @@ export default function EarningsPage() {
               <div className="flex items-center gap-4 mt-2">
                 {[
                   { label: "Deal Payments", color: "#6C5CE7" },
-                  { label: "Affiliate", color: "#00B894" },
                   { label: "Clipping", color: "#4ECDC4" },
                 ].map((l) => (
                   <div key={l.label} className="flex items-center gap-1.5 text-xs text-[#8892A8]">
@@ -151,15 +180,11 @@ export default function EarningsPage() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={earningsData}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="deals" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6C5CE7" stopOpacity={0.3} />
                   <stop offset="95%" stopColor="#6C5CE7" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="affiliate" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00B894" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#00B894" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="clipping" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#4ECDC4" stopOpacity={0.3} />
@@ -181,14 +206,6 @@ export default function EarningsPage() {
                 stackId="1"
                 stroke="#6C5CE7"
                 fill="url(#deals)"
-                strokeWidth={2}
-              />
-              <Area
-                type="monotone"
-                dataKey="affiliate"
-                stackId="1"
-                stroke="#00B894"
-                fill="url(#affiliate)"
                 strokeWidth={2}
               />
               <Area
@@ -256,7 +273,10 @@ export default function EarningsPage() {
                 </div>
               ))}
             </div>
-            <button className="w-full mt-4 border border-[#2A3050] hover:bg-[#1A2035] text-sm font-semibold text-[#E2E8F0] py-2.5 rounded-xl transition-colors">
+            <button
+              onClick={() => toast.info("Payout settings editor coming soon")}
+              className="w-full mt-4 border border-[#2A3050] hover:bg-[#1A2035] text-sm font-semibold text-[#E2E8F0] py-2.5 rounded-xl transition-colors"
+            >
               Edit Payout Settings
             </button>
           </div>
@@ -266,7 +286,7 @@ export default function EarningsPage() {
         <div className="bg-[#131825] border border-[#2A3050] rounded-2xl overflow-hidden">
           <div className="px-5 py-4 border-b border-[#2A3050] flex items-center justify-between">
             <h2 className="text-sm font-bold text-[#E2E8F0]">Transaction History</h2>
-            <button className="text-xs text-[#6C5CE7] hover:underline">Export CSV</button>
+            <button onClick={exportCSV} className="text-xs text-[#6C5CE7] hover:underline">Export CSV</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -291,8 +311,8 @@ export default function EarningsPage() {
                     <td className="px-5 py-3 font-mono text-[#8892A8]">{t.date}</td>
                     <td className="px-5 py-3 text-[#E2E8F0] max-w-[200px] truncate">{t.description}</td>
                     <td className="px-5 py-3">
-                      {t.channel === "—" ? (
-                        <span className="text-[#8892A8]">—</span>
+                      {t.channel === "-" ? (
+                        <span className="text-[#8892A8]">-</span>
                       ) : (
                         <ChannelChip channel={t.channel} />
                       )}

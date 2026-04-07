@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import {
   Handshake,
@@ -7,7 +9,9 @@ import {
   TrendingUp,
   Shield,
   Zap,
+  BarChart2,
 } from "lucide-react"
+import { toast } from "sonner"
 import { tickerItems, channelCategories } from "@/lib/data"
 
 const heroPills = [
@@ -20,7 +24,7 @@ const heroPills = [
   { label: "Twitch Stream", color: "#9146FF", delay: "3s", pos: "bottom-64 left-[28%]", anim: "animate-float-slow" },
   { label: "Instagram Story", color: "#E91E8C", delay: "1.2s", pos: "bottom-56 right-[28%]", anim: "animate-float-right" },
   { label: "Reddit Post", color: "#FF5700", delay: "0.8s", pos: "top-72 left-[40%]", anim: "animate-float-left" },
-  { label: "Affiliate Link", color: "#00B894", delay: "2.2s", pos: "bottom-72 right-[42%]", anim: "animate-float-slow" },
+  { label: "Video Clip", color: "#00B894", delay: "2.2s", pos: "bottom-72 right-[42%]", anim: "animate-float-slow" },
 ]
 
 const features = [
@@ -33,13 +37,13 @@ const features = [
   {
     icon: Video,
     title: "Clipping Engine",
-    description: "Turn long-form content into monetizable clips. Auto-detect brand moments and earn passive income from your existing library.",
+    description: "Brands provide overlay assets that get composited onto creator short-form videos automatically. Earn per-view revenue from every clip.",
     color: "#FF6B35",
   },
   {
-    icon: Link2,
-    title: "Affiliate Network",
-    description: "Stack affiliate commissions on top of flat-fee deals. Track clicks, conversions, and revenue in one unified dashboard.",
+    icon: BarChart2,
+    title: "Analytics Dashboard",
+    description: "Track campaign performance, audience reach, engagement rates, and revenue across every channel in one unified dashboard.",
     color: "#00B894",
   },
 ]
@@ -66,7 +70,7 @@ export default function LandingPage() {
           <Link href="/campaign-builder" className="hover:text-white transition-colors">Pricing</Link>
         </nav>
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-sm text-[#8892A8] hover:text-white transition-colors">Log in</Link>
+          <Link href="/marketplace" className="text-sm text-[#8892A8] hover:text-white transition-colors">Log in</Link>
           <Link
             href="/marketplace"
             className="bg-[#6C5CE7] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#5a4dd4] transition-colors"
@@ -116,7 +120,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg md:text-xl text-[#8892A8] max-w-2xl mx-auto leading-relaxed mb-10">
-            Brands post campaigns. Creators list services. Deals happen across TikTok, YouTube, Discord, podcasts, newsletters, Twitter/X, Twitch, and beyond — all in one place.
+            Brands post campaigns. Creators list services. Deals happen across TikTok, YouTube, Discord, podcasts, newsletters, Twitter/X, Twitch, and beyond -- all in one place.
           </p>
 
           {/* Split CTA */}
@@ -300,30 +304,33 @@ export default function LandingPage() {
               <div>
                 <p className="font-semibold text-[#E2E8F0] mb-3">Company</p>
                 <ul className="space-y-2 text-[#8892A8]">
-                  <li><span className="hover:text-white cursor-pointer">About</span></li>
-                  <li><span className="hover:text-white cursor-pointer">Blog</span></li>
-                  <li><span className="hover:text-white cursor-pointer">Careers</span></li>
+                  <li><Link href="/coming-soon" className="hover:text-white">About</Link></li>
+                  <li><Link href="/coming-soon" className="hover:text-white">Blog</Link></li>
+                  <li><Link href="/coming-soon" className="hover:text-white">Careers</Link></li>
                 </ul>
               </div>
               <div>
                 <p className="font-semibold text-[#E2E8F0] mb-3">Legal</p>
                 <ul className="space-y-2 text-[#8892A8]">
-                  <li><span className="hover:text-white cursor-pointer">Privacy</span></li>
-                  <li><span className="hover:text-white cursor-pointer">Terms</span></li>
-                  <li><span className="hover:text-white cursor-pointer">Cookie Policy</span></li>
+                  <li><Link href="/coming-soon" className="hover:text-white">Privacy</Link></li>
+                  <li><Link href="/coming-soon" className="hover:text-white">Terms</Link></li>
+                  <li><Link href="/coming-soon" className="hover:text-white">Cookie Policy</Link></li>
                 </ul>
               </div>
             </div>
           </div>
           <div className="border-t border-[#2A3050] pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-[#8892A8] text-xs">© 2026 Marketingplace. All rights reserved.</p>
+            <p className="text-[#8892A8] text-xs">2026 Marketingplace. All rights reserved.</p>
             <div className="flex items-center gap-2">
               <input
                 type="email"
                 placeholder="Enter your email"
                 className="bg-[#131825] border border-[#2A3050] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] placeholder-[#8892A8] outline-none focus:border-[#6C5CE7] w-52"
               />
-              <button className="bg-[#6C5CE7] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#5a4dd4] transition-colors">
+              <button
+                onClick={() => toast.info("Coming soon!")}
+                className="bg-[#6C5CE7] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#5a4dd4] transition-colors"
+              >
                 Subscribe
               </button>
             </div>

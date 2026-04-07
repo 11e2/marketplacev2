@@ -1,4 +1,8 @@
+"use client"
+
+import Link from "next/link"
 import { Star, MessageSquare, Send, CheckCircle, Users, Clock, TrendingUp } from "lucide-react"
+import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 
 const services = [
@@ -85,7 +89,7 @@ const reviews = [
     brandInitial: "N",
     brandColor: "#6C5CE7",
     rating: 5,
-    text: "Alex delivered an incredibly natural TikTok integration. The engagement on the post was 3x our benchmark — we'll definitely work together again.",
+    text: "Alex delivered an incredibly natural TikTok integration. The engagement on the post was 3x our benchmark -- we'll definitely work together again.",
     date: "2 weeks ago",
   },
   {
@@ -101,7 +105,7 @@ const reviews = [
     brandInitial: "A",
     brandColor: "#FF9F43",
     rating: 4,
-    text: "The podcast read felt authentic and the affiliate conversions were strong. Would recommend for any health-adjacent brand in the gaming space.",
+    text: "The podcast read felt authentic and the listener response was strong. Would recommend for any health-adjacent brand in the gaming space.",
     date: "6 weeks ago",
   },
 ]
@@ -155,14 +159,20 @@ export default function ProfilePage() {
 
             {/* Action buttons */}
             <div className="flex gap-2 shrink-0">
-              <button className="flex items-center gap-2 bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+              <button
+                onClick={() => toast.info("Offer form coming soon")}
+                className="flex items-center gap-2 bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
+              >
                 <Send size={14} />
                 Send Offer
               </button>
-              <button className="flex items-center gap-2 border border-[#2A3050] hover:bg-[#1A2035] text-[#E2E8F0] text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
+              <Link
+                href="/messaging"
+                className="flex items-center gap-2 border border-[#2A3050] hover:bg-[#1A2035] text-[#E2E8F0] text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
+              >
                 <MessageSquare size={14} />
                 Message
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -198,6 +208,7 @@ export default function ProfilePage() {
                   ))}
                 </div>
                 <button
+                  onClick={() => toast.success("Booking request sent!")}
                   className="w-full mt-4 py-2 rounded-lg text-xs font-bold text-white transition-colors"
                   style={{ backgroundColor: svc.accentColor }}
                 >
