@@ -2,29 +2,42 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Search, Filter, ChevronDown } from "lucide-react"
+import Image from "next/image"
+import { useRouter } from "next/navigation"
+import { Search, Filter, ChevronDown, Zap, Users, Eye, DollarSign } from "lucide-react"
 import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ChannelChip } from "@/components/channel-chip"
 import { campaigns, trendingChannels, matchScores } from "@/lib/data"
 import type { Campaign } from "@/lib/types"
 
-const filterPills = ["All", "TikTok", "YouTube", "Twitter/X", "Discord", "Newsletter", "Podcast", "Twitch", "Instagram", "More"]
+const filterPills = ["All", "Clipping", "TikTok", "Reels", "Shorts", "YouTube", "Twitter/X", "Discord", "Newsletter", "Podcast"]
 
 export default function MarketplacePage() {
+  const router = useRouter()
   const [activeFilter, setActiveFilter] = useState("All")
   const [search, setSearch] = useState("")
 
-  const filtered = campaigns.filter((c) => {
-    const matchSearch =
-      search === "" ||
-      c.brand.toLowerCase().includes(search.toLowerCase()) ||
-      c.title.toLowerCase().includes(search.toLowerCase())
-    const matchFilter =
-      activeFilter === "All" ||
-      c.channels.some((ch) => ch.toLowerCase().includes(activeFilter.toLowerCase()))
-    return matchSearch && matchFilter
-  })
+  // Separate clipping and non-clipping campaigns
+  const clippingCampaigns = campaigns.filter((c) => c.isClipping)
+  const otherCampaigns = campaigns.filter((c) => !c.isClipping)
+
+  const filterCampaigns = (list: Campaign[]) => {
+    return list.filter((c) => {
+      const matchSearch =
+        search === "" ||
+        c.brand.toLowerCase().includes(search.toLowerCase()) ||
+        c.title.toLowerCase().includes(search.toLowerCase())
+      const matchFilter =
+        activeFilter === "All" ||
+        activeFilter === "Clipping" && c.isClipping ||
+        c.channels.some((ch) => ch.toLowerCase().includes(activeFilter.toLowerCase()))
+      return matchSearch && matchFilter
+    })
+  }
+
+  const filteredClipping = filterCampaigns(clippingCampaigns)
+  const filteredOther = filterCampaigns(otherCampaigns)
 
   const handleTrendingClick = (channelName: string) => {
     const channel = channelName.split(" ")[0]
@@ -37,6 +50,21 @@ export default function MarketplacePage() {
       el.scrollIntoView({ behavior: "smooth", block: "center" })
       el.classList.add("ring-2", "ring-[#6C5CE7]")
       setTimeout(() => el.classList.remove("ring-2", "ring-[#6C5CE7]"), 2000)
+    }
+  }
+
+  const handleApply = (campaign: Campaign) => {
+    if (campaign.isClipping && campaign.brandAssetUrl) {
+      // Navigate to video studio with campaign data
+      const params = new URLSearchParams({
+        campaignId: campaign.id.toString(),
+        brand: campaign.brand,
+        assetUrl: campaign.brandAssetUrl,
+      })
+      router.push(`/video-studio?${params.toString()}`)
+    } else {
+      // Non-clipping: just show toast (placeholder)
+      toast.success("Application submitted! The brand will review your profile.")
     }
   }
 
@@ -74,13 +102,14 @@ export default function MarketplacePage() {
               <button
                 key={pill}
                 onClick={() => setActiveFilter(pill)}
-                className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border transition-all"
+                className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5"
                 style={
                   activeFilter === pill
                     ? { backgroundColor: "#6C5CE7", borderColor: "#6C5CE7", color: "#fff" }
                     : { backgroundColor: "#131825", borderColor: "#2A3050", color: "#8892A8" }
                 }
               >
+                {pill === "Clipping" && <Zap size={12} />}
                 {pill}
               </button>
             ))}
@@ -90,24 +119,47 @@ export default function MarketplacePage() {
         <div className="flex flex-1 min-w-0">
           {/* Main feed */}
           <main className="flex-1 px-6 py-6">
-            <div className="flex items-center justify-between mb-5">
-              <h1 className="text-lg font-bold text-[#E2E8F0]">Brand Campaigns</h1>
-              <span className="text-sm text-[#8892A8]">{filtered.length} available</span>
-            </div>
+            {/* Clipping Campaigns Section */}
+            {(activeFilter === "All" || activeFilter === "Clipping" || ["TikTok", "Reels", "Shorts"].includes(activeFilter)) && filteredClipping.length > 0 && (
+              <section className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-[#6C5CE720] flex items-center justify-center">
+                    <Zap size={16} className="text-[#6C5CE7]" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-[#E2E8F0]">Clipping Campaigns</h2>
+                    <p className="text-xs text-[#8892A8]">Upload your video, apply brand overlay, earn per view</p>
+                  </div>
+                </div>
 
-            {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-[#8892A8]">
-                <Search size={32} className="mb-3 opacity-40" />
-                <p className="font-medium">No campaigns found</p>
-                <p className="text-sm mt-1">Try adjusting your search or filters</p>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 gap-4">
-                {filtered.map((campaign) => (
-                  <CampaignCard key={campaign.id} campaign={campaign} />
-                ))}
-              </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {filteredClipping.map((campaign) => (
+                    <ClippingCampaignCard key={campaign.id} campaign={campaign} onApply={handleApply} />
+                  ))}
+                </div>
+              </section>
             )}
+
+            {/* Other Campaigns Section */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-[#E2E8F0]">Other Campaigns</h2>
+                <span className="text-sm text-[#8892A8]">{filteredOther.length} available</span>
+              </div>
+
+              {filteredOther.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-[#8892A8] bg-[#131825] border border-[#2A3050] rounded-xl">
+                  <Search size={24} className="mb-2 opacity-40" />
+                  <p className="text-sm">No campaigns found</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {filteredOther.map((campaign) => (
+                    <OtherCampaignCard key={campaign.id} campaign={campaign} onApply={handleApply} />
+                  ))}
+                </div>
+              )}
+            </section>
           </main>
 
           {/* Right sidebar */}
@@ -175,51 +227,158 @@ export default function MarketplacePage() {
   )
 }
 
-function CampaignCard({ campaign }: { campaign: Campaign }) {
+function ClippingCampaignCard({ campaign, onApply }: { campaign: Campaign; onApply: (c: Campaign) => void }) {
   return (
-    <div id={`campaign-${campaign.title.split(":")[0].trim()}`} className="bg-[#131825] border border-[#2A3050] rounded-xl overflow-hidden hover:border-[#6C5CE7]/40 hover:shadow-lg hover:shadow-black/30 transition-all group">
-      {/* Accent bar */}
-      <div className="h-1" style={{ backgroundColor: campaign.accentColor }} />
+    <div
+      id={`campaign-${campaign.brand}`}
+      className="bg-[#131825] border border-[#2A3050] rounded-xl overflow-hidden hover:border-[#6C5CE7]/60 hover:shadow-lg hover:shadow-[#6C5CE7]/10 transition-all group"
+    >
+      {/* Accent bar with gradient */}
+      <div className="h-1.5 bg-gradient-to-r from-[#6C5CE7] to-[#FF6B35]" />
 
       <div className="p-5">
-        <Link href={`/campaign/${campaign.id}`} className="block cursor-pointer">
-          {/* Brand header */}
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-2.5">
+        {/* Brand header with logo preview */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {campaign.brandAssetUrl ? (
+              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
+                <Image
+                  src={campaign.brandAssetUrl}
+                  alt={campaign.brand}
+                  width={40}
+                  height={40}
+                  className="object-contain"
+                />
+              </div>
+            ) : (
               <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-lg font-bold shrink-0"
                 style={{ backgroundColor: campaign.brandColor }}
               >
                 {campaign.brandInitial}
               </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold text-[#E2E8F0]">{campaign.brand}</span>
-                  {campaign.verified && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#00B89420] text-[#00B894]">
-                      Verified
-                    </span>
-                  )}
-                </div>
+            )}
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-base font-bold text-[#E2E8F0]">{campaign.brand}</span>
+                {campaign.verified && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#00B89420] text-[#00B894]">
+                    Verified
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1 mt-0.5">
+                <Zap size={12} className="text-[#6C5CE7]" />
+                <span className="text-xs text-[#6C5CE7] font-semibold">Clipping Campaign</span>
               </div>
             </div>
-            {/* Rate badge */}
-            <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-[#00B89420] text-[#00B894] shrink-0">
-              {campaign.rate}
+          </div>
+          {/* Rate badge */}
+          <span className="text-sm font-bold font-mono px-3 py-1.5 rounded-lg bg-[#00B89420] text-[#00B894] shrink-0">
+            {campaign.rate}
+          </span>
+        </div>
+
+        {/* Title & description */}
+        <h3 className="text-sm font-bold text-[#E2E8F0] mb-1.5">{campaign.title}</h3>
+        <p className="text-xs text-[#8892A8] leading-relaxed line-clamp-2 mb-4">{campaign.description}</p>
+
+        {/* Stats row */}
+        <div className="flex flex-wrap gap-3 mb-4">
+          <div className="flex items-center gap-1.5 text-xs">
+            <Users size={12} className="text-[#8892A8]" />
+            <span className="text-[#8892A8]">Min:</span>
+            <span className="font-mono font-semibold text-[#E2E8F0]">{(campaign.minFollowers || 0).toLocaleString()} followers</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <Eye size={12} className="text-[#8892A8]" />
+            <span className="text-[#8892A8]">Min:</span>
+            <span className="font-mono font-semibold text-[#E2E8F0]">{(campaign.minViews || 0).toLocaleString()} views</span>
+          </div>
+        </div>
+
+        {/* Channel chips */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {campaign.channels.map((ch) => (
+            <ChannelChip key={ch} channel={ch} />
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-3 border-t border-[#2A3050]">
+          <div className="flex items-center gap-3 text-xs text-[#8892A8]">
+            <span className="flex items-center gap-1">
+              <DollarSign size={12} />
+              Budget: <span className="font-mono font-semibold text-[#E2E8F0]">{campaign.budget}</span>
             </span>
+            <span>{campaign.spots} spots left</span>
           </div>
+          <button
+            onClick={() => onApply(campaign)}
+            className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-xs font-semibold px-5 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <Zap size={12} />
+            Apply & Create
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-          {/* Title & description */}
-          <h3 className="text-sm font-bold text-[#E2E8F0] mb-1.5">{campaign.title}</h3>
-          <p className="text-xs text-[#8892A8] leading-relaxed line-clamp-2 mb-3">{campaign.description}</p>
+function OtherCampaignCard({ campaign, onApply }: { campaign: Campaign; onApply: (c: Campaign) => void }) {
+  return (
+    <div
+      id={`campaign-${campaign.brand}`}
+      className="bg-[#131825] border border-[#2A3050] rounded-xl overflow-hidden hover:border-[#6C5CE7]/40 transition-all opacity-80 hover:opacity-100"
+    >
+      {/* Accent bar */}
+      <div className="h-1" style={{ backgroundColor: campaign.accentColor }} />
 
-          {/* Channel chips */}
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {campaign.channels.map((ch) => (
-              <ChannelChip key={ch} channel={ch} />
-            ))}
+      <div className="p-5">
+        {/* Template badge */}
+        <div className="mb-3">
+          <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-[#8892A820] text-[#8892A8] uppercase tracking-wide">
+            Standard Campaign
+          </span>
+        </div>
+
+        {/* Brand header */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+              style={{ backgroundColor: campaign.brandColor }}
+            >
+              {campaign.brandInitial}
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-[#E2E8F0]">{campaign.brand}</span>
+                {campaign.verified && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#00B89420] text-[#00B894]">
+                    Verified
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </Link>
+          {/* Rate badge */}
+          <span className="text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-[#8892A820] text-[#8892A8] shrink-0">
+            {campaign.rate}
+          </span>
+        </div>
+
+        {/* Title & description */}
+        <h3 className="text-sm font-bold text-[#E2E8F0] mb-1.5">{campaign.title}</h3>
+        <p className="text-xs text-[#8892A8] leading-relaxed line-clamp-2 mb-3">{campaign.description}</p>
+
+        {/* Channel chips */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {campaign.channels.map((ch) => (
+            <ChannelChip key={ch} channel={ch} />
+          ))}
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-[#2A3050]">
@@ -228,8 +387,8 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
             <span>{campaign.spots} spots left</span>
           </div>
           <button
-            onClick={() => toast.success("Application submitted!")}
-            className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
+            onClick={() => onApply(campaign)}
+            className="border border-[#2A3050] hover:border-[#6C5CE7] text-[#8892A8] hover:text-[#E2E8F0] text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
           >
             Apply
           </button>

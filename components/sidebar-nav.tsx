@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useState, useEffect } from "react"
 import {
   Store,
   Layers,
@@ -11,12 +12,13 @@ import {
   BarChart2,
   Wallet,
   TrendingUp,
+  Link2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const creatorNav = [
   { label: "Marketplace", href: "/marketplace", icon: Store },
-  { label: "My Services", href: "/services", icon: Layers },
+  { label: "Linked Accounts", href: "/linked-accounts", icon: Link2 },
   { label: "Active Deals", href: "/messaging", icon: Handshake },
   { label: "Video Studio", href: "/video-studio", icon: Video },
   { label: "Messages", href: "/messaging", icon: MessageSquare },
@@ -37,8 +39,23 @@ interface SidebarNavProps {
   mode?: "creator" | "brand"
 }
 
-export function SidebarNav({ mode = "creator" }: SidebarNavProps) {
+export function SidebarNav({ mode: initialMode = "creator" }: SidebarNavProps) {
   const pathname = usePathname()
+  const [mode, setMode] = useState<"creator" | "brand">(initialMode)
+  
+  // Persist mode preference
+  useEffect(() => {
+    const stored = localStorage.getItem("marketingplace-mode")
+    if (stored === "creator" || stored === "brand") {
+      setMode(stored)
+    }
+  }, [])
+  
+  const handleModeChange = (newMode: "creator" | "brand") => {
+    setMode(newMode)
+    localStorage.setItem("marketingplace-mode", newMode)
+  }
+  
   const nav = mode === "creator" ? creatorNav : brandNav
 
   return (
@@ -50,9 +67,37 @@ export function SidebarNav({ mode = "creator" }: SidebarNavProps) {
           <span className="font-bold text-sm tracking-wide text-foreground">MARKETINGPLACE</span>
         </Link>
       </div>
+      
+      {/* Creator / Brand Toggle */}
+      <div className="px-3 pt-4 pb-2">
+        <div className="flex items-center bg-secondary rounded-lg p-1">
+          <button
+            onClick={() => handleModeChange("creator")}
+            className={cn(
+              "flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all",
+              mode === "creator"
+                ? "bg-[#6C5CE7] text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Creator
+          </button>
+          <button
+            onClick={() => handleModeChange("brand")}
+            className={cn(
+              "flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all",
+              mode === "brand"
+                ? "bg-[#6C5CE7] text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Brand
+          </button>
+        </div>
+      </div>
 
       {/* Nav items */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+      <nav className="flex-1 px-3 py-2 space-y-0.5">
         {nav.map((item) => {
           const isActive = pathname === item.href
           const Icon = item.icon
