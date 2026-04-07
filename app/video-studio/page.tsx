@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import Image from "next/image"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -16,11 +15,9 @@ import {
   AlertCircle,
   RefreshCw,
   Image as ImageIcon,
-  Zap,
   ArrowLeft,
-  Settings2,
-  Grid3X3,
   Send,
+  CheckCircle2,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -34,34 +31,27 @@ const POSITION_GRID = [
 type Position = (typeof POSITION_GRID)[number][number]
 
 const POSITION_LABELS: Record<Position, string> = {
-  "top-left": "Top Left",
-  "top-center": "Top Center",
-  "top-right": "Top Right",
-  "middle-left": "Middle Left",
-  "center": "Center",
-  "middle-right": "Middle Right",
-  "bottom-left": "Bottom Left",
-  "bottom-center": "Bottom Center",
-  "bottom-right": "Bottom Right",
+  "top-left": "TL",
+  "top-center": "TC",
+  "top-right": "TR",
+  "middle-left": "ML",
+  "center": "C",
+  "middle-right": "MR",
+  "bottom-left": "BL",
+  "bottom-center": "BC",
+  "bottom-right": "BR",
 }
 
-const MAX_VIDEO_SIZE = 100 * 1024 * 1024 // 100MB
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"]
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"]
 
 type ProcessingState = "idle" | "processing" | "success" | "error"
 type PositionMode = "grid" | "advanced"
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 function VideoStudioContent() {
   const searchParams = useSearchParams()
-  
-  // Campaign data from URL params
+
   const campaignId = searchParams.get("campaignId")
   const campaignBrand = searchParams.get("brand")
   const campaignAssetUrl = searchParams.get("assetUrl")
@@ -82,13 +72,13 @@ function VideoStudioContent() {
   const [isPreloaded, setIsPreloaded] = useState(false)
   const overlayInputRef = useRef<HTMLInputElement>(null)
 
-  // Settings
+  // Settings — defaults: bottom-center, 50%
   const [positionMode, setPositionMode] = useState<PositionMode>("grid")
-  const [position, setPosition] = useState<Position>("bottom-right")
-  const [customX, setCustomX] = useState(20) // percentage from left
-  const [customY, setCustomY] = useState(80) // percentage from top
-  const [size, setSize] = useState(15)
-  const padding = 20 // fixed padding in pixels
+  const [position, setPosition] = useState<Position>("bottom-center")
+  const [customX, setCustomX] = useState(50)
+  const [customY, setCustomY] = useState(90)
+  const [size, setSize] = useState(50)
+  const padding = 20
 
   // Processing state
   const [processingState, setProcessingState] = useState<ProcessingState>("idle")
@@ -96,10 +86,9 @@ function VideoStudioContent() {
   const [errorMessage, setErrorMessage] = useState<string>("")
   const [resultUrl, setResultUrl] = useState<string | null>(null)
 
-  // Canvas ref for processing
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // Load campaign asset if coming from marketplace
+  // Load campaign asset
   useEffect(() => {
     if (isFromCampaign && campaignAssetUrl && !isPreloaded) {
       setOverlayPreviewUrl(campaignAssetUrl)
@@ -107,13 +96,12 @@ function VideoStudioContent() {
     }
   }, [isFromCampaign, campaignAssetUrl, isPreloaded])
 
-  // Load overlay image when URL changes
+  // Load overlay image
   useEffect(() => {
     if (!overlayPreviewUrl) {
       setOverlayImage(null)
       return
     }
-
     const img = new window.Image()
     img.crossOrigin = "anonymous"
     img.onload = () => setOverlayImage(img)
@@ -124,7 +112,6 @@ function VideoStudioContent() {
     img.src = overlayPreviewUrl
   }, [overlayPreviewUrl])
 
-  // Calculate overlay coordinates for both preview and processing
   const getOverlayCoords = useCallback((
     videoWidth: number,
     videoHeight: number,
@@ -132,14 +119,11 @@ function VideoStudioContent() {
     overlayHeight: number
   ): { x: number; y: number } => {
     if (positionMode === "advanced") {
-      // Custom coordinates (percentage-based)
       return {
         x: (customX / 100) * videoWidth - overlayWidth / 2,
         y: (customY / 100) * videoHeight - overlayHeight / 2,
       }
     }
-
-    // Grid-based positioning
     const positions: Record<Position, { x: number; y: number }> = {
       "top-left": { x: padding, y: padding },
       "top-center": { x: (videoWidth - overlayWidth) / 2, y: padding },
@@ -154,7 +138,6 @@ function VideoStudioContent() {
     return positions[position]
   }, [positionMode, position, customX, customY, padding])
 
-  // Get video dimensions when loaded
   const handleVideoMetadata = useCallback(() => {
     if (previewVideoRef.current) {
       setVideoDimensions({
@@ -164,21 +147,16 @@ function VideoStudioContent() {
     }
   }, [])
 
-  // Handle video selection
   const handleVideoSelect = useCallback((file: File) => {
     if (!ACCEPTED_VIDEO_TYPES.includes(file.type)) {
-      setErrorMessage("Please select a valid video file (MP4, MOV, or WebM)")
-      setProcessingState("error")
+      toast.error("Please select a valid video file (MP4, MOV, or WebM)")
       return
     }
     if (file.size > MAX_VIDEO_SIZE) {
-      setErrorMessage("Video file must be under 100MB for browser processing")
-      setProcessingState("error")
+      toast.error("Video file must be under 100MB for browser processing")
       return
     }
-
     if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl)
-
     setVideoFile(file)
     setVideoPreviewUrl(URL.createObjectURL(file))
     setVideoDimensions(null)
@@ -186,16 +164,12 @@ function VideoStudioContent() {
     setResultUrl(null)
   }, [videoPreviewUrl])
 
-  // Handle overlay selection
   const handleOverlaySelect = useCallback((file: File) => {
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      setErrorMessage("Please select a valid image file (PNG, JPG, GIF, or WebP)")
-      setProcessingState("error")
+      toast.error("Please select a valid image file (PNG, JPG, GIF, or WebP)")
       return
     }
-
     if (overlayPreviewUrl && !isPreloaded) URL.revokeObjectURL(overlayPreviewUrl)
-
     setOverlayFile(file)
     setOverlayPreviewUrl(URL.createObjectURL(file))
     setIsPreloaded(false)
@@ -203,7 +177,6 @@ function VideoStudioContent() {
     setResultUrl(null)
   }, [overlayPreviewUrl, isPreloaded])
 
-  // Clear video
   const handleClearVideo = useCallback(() => {
     if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl)
     setVideoFile(null)
@@ -213,7 +186,6 @@ function VideoStudioContent() {
     setResultUrl(null)
   }, [videoPreviewUrl])
 
-  // Clear overlay
   const handleClearOverlay = useCallback(() => {
     if (overlayPreviewUrl && !isPreloaded) URL.revokeObjectURL(overlayPreviewUrl)
     setOverlayFile(null)
@@ -224,7 +196,6 @@ function VideoStudioContent() {
     setResultUrl(null)
   }, [overlayPreviewUrl, isPreloaded])
 
-  // Process video using Canvas + MediaRecorder
   const handleProcess = useCallback(async () => {
     if (!videoFile || !overlayImage || !hiddenVideoRef.current || !canvasRef.current) return
 
@@ -238,29 +209,23 @@ function VideoStudioContent() {
     setErrorMessage("")
 
     try {
-      // Load video metadata
       video.src = videoPreviewUrl!
       video.muted = true
-      
       await new Promise<void>((resolve, reject) => {
         video.onloadedmetadata = () => resolve()
         video.onerror = () => reject(new Error("Failed to load video"))
         video.load()
       })
 
-      // Set canvas size to match video
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
 
-      // Calculate overlay dimensions (opacity always 100%)
       const overlayWidth = (video.videoWidth * size) / 100
       const overlayHeight = (overlayImage.height / overlayImage.width) * overlayWidth
       const overlayPos = getOverlayCoords(video.videoWidth, video.videoHeight, overlayWidth, overlayHeight)
 
-      // Set up MediaRecorder with canvas stream
-      const stream = canvas.captureStream(30) // 30 FPS
-      
-      // Add audio track from video if it exists
+      const stream = canvas.captureStream(30)
+
       const videoWithAudio = document.createElement("video")
       videoWithAudio.src = videoPreviewUrl!
       videoWithAudio.muted = false
@@ -268,8 +233,7 @@ function VideoStudioContent() {
         videoWithAudio.onloadedmetadata = () => resolve()
         videoWithAudio.load()
       })
-      
-      // Try to capture audio
+
       let hasAudio = false
       try {
         const audioCtx = new AudioContext()
@@ -277,106 +241,58 @@ function VideoStudioContent() {
         const dest = audioCtx.createMediaStreamDestination()
         source.connect(dest)
         source.connect(audioCtx.destination)
-        
         const audioTrack = dest.stream.getAudioTracks()[0]
         if (audioTrack) {
           stream.addTrack(audioTrack)
           hasAudio = true
         }
-      } catch {
-        // No audio or audio capture not supported
-      }
+      } catch { /* no audio */ }
 
-      // Choose best supported format
-      const mimeTypes = [
-        "video/webm;codecs=vp9",
-        "video/webm;codecs=vp8",
-        "video/webm",
-        "video/mp4",
-      ]
+      const mimeTypes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"]
       let mimeType = ""
       for (const type of mimeTypes) {
-        if (MediaRecorder.isTypeSupported(type)) {
-          mimeType = type
-          break
-        }
+        if (MediaRecorder.isTypeSupported(type)) { mimeType = type; break }
       }
-      if (!mimeType) {
-        throw new Error("No supported video format found")
-      }
+      if (!mimeType) throw new Error("No supported video format found")
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: 5000000, // 5 Mbps
-      })
-
+      const mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5000000 })
       const chunks: Blob[] = []
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data)
-      }
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
 
       const recordingComplete = new Promise<Blob>((resolve, reject) => {
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: mimeType })
-          resolve(blob)
-        }
+        mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }))
         mediaRecorder.onerror = (e) => reject(e)
       })
 
-      // Start recording
-      mediaRecorder.start(100) // Collect data every 100ms
-
-      // Play and render video frames
+      mediaRecorder.start(100)
       video.currentTime = 0
-      
+
       const renderFrame = () => {
         if (video.paused || video.ended) return
-
-        // Draw video frame
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-        // Draw overlay at 100% opacity
         ctx.drawImage(overlayImage, overlayPos.x, overlayPos.y, overlayWidth, overlayHeight)
-
-        // Update progress
-        const progress = (video.currentTime / video.duration) * 100
-        setProcessingProgress(Math.round(progress))
-
+        setProcessingProgress(Math.round((video.currentTime / video.duration) * 100))
         requestAnimationFrame(renderFrame)
       }
 
-      // Start playback and rendering
-      video.onended = () => {
-        mediaRecorder.stop()
-      }
-
+      video.onended = () => mediaRecorder.stop()
       await video.play()
       renderFrame()
 
-      // Wait for recording to complete
       const outputBlob = await recordingComplete
+      if (hasAudio) { videoWithAudio.pause(); videoWithAudio.src = "" }
 
-      // Clean up
-      if (hasAudio) {
-        videoWithAudio.pause()
-        videoWithAudio.src = ""
-      }
-
-      // Create download URL
       const url = URL.createObjectURL(outputBlob)
       if (resultUrl) URL.revokeObjectURL(resultUrl)
       setResultUrl(url)
       setProcessingState("success")
       setProcessingProgress(100)
-
     } catch (err) {
-      console.error("Video processing error:", err)
       setErrorMessage(err instanceof Error ? err.message : "Video processing failed")
       setProcessingState("error")
     }
   }, [videoFile, videoPreviewUrl, overlayImage, size, getOverlayCoords, resultUrl])
 
-  // Reset for re-processing
   const handleProcessAgain = useCallback(() => {
     if (resultUrl) URL.revokeObjectURL(resultUrl)
     setResultUrl(null)
@@ -384,7 +300,6 @@ function VideoStudioContent() {
     setProcessingProgress(0)
   }, [resultUrl])
 
-  // Download result
   const handleDownload = useCallback(() => {
     if (!resultUrl) return
     const a = document.createElement("a")
@@ -395,26 +310,59 @@ function VideoStudioContent() {
     document.body.removeChild(a)
   }, [resultUrl])
 
-  // Publish handler
   const handlePublish = useCallback(() => {
     toast.success("Video ready to publish! Connect your account to post directly.")
   }, [])
 
   const canProcess = videoFile && overlayImage && processingState !== "processing"
 
-  // Calculate preview overlay styles that match actual processing
-  const getPreviewOverlayStyles = useCallback(() => {
-    if (!videoDimensions || !overlayImage) return {}
-    
-    const overlayWidth = (videoDimensions.width * size) / 100
-    const overlayHeight = (overlayImage.height / overlayImage.width) * overlayWidth
-    const coords = getOverlayCoords(videoDimensions.width, videoDimensions.height, overlayWidth, overlayHeight)
-    
-    // Convert to percentage for responsive preview
+  // Overlay preview styles — positions the overlay relative to the actual
+  // rendered video rect inside the object-contain preview container.
+  // containerRef is set on the video wrapper div so we can measure it.
+  const previewContainerRef = useRef<HTMLDivElement>(null)
+
+  const getPreviewOverlayStyles = useCallback((): React.CSSProperties => {
+    if (!videoDimensions || !overlayImage || !previewContainerRef.current) return { display: "none" }
+
+    const container = previewContainerRef.current
+    const containerW = container.clientWidth
+    const containerH = container.clientHeight
+
+    // Compute the rendered video size inside the container (object-contain letterbox)
+    const videoAR = videoDimensions.width / videoDimensions.height
+    const containerAR = containerW / containerH
+
+    let renderedW: number, renderedH: number
+    if (videoAR > containerAR) {
+      renderedW = containerW
+      renderedH = containerW / videoAR
+    } else {
+      renderedH = containerH
+      renderedW = containerH * videoAR
+    }
+
+    // Letterbox offsets (centred)
+    const offsetX = (containerW - renderedW) / 2
+    const offsetY = (containerH - renderedH) / 2
+
+    // Overlay dimensions in video space
+    const overlayW = (videoDimensions.width * size) / 100
+    const overlayH = (overlayImage.height / overlayImage.width) * overlayW
+
+    // Overlay position in video space
+    const coords = getOverlayCoords(videoDimensions.width, videoDimensions.height, overlayW, overlayH)
+
+    // Scale to rendered video space
+    const scaleX = renderedW / videoDimensions.width
+    const scaleY = renderedH / videoDimensions.height
+
     return {
-      left: `${(coords.x / videoDimensions.width) * 100}%`,
-      top: `${(coords.y / videoDimensions.height) * 100}%`,
-      width: `${size}%`,
+      position: "absolute",
+      left: offsetX + coords.x * scaleX,
+      top: offsetY + coords.y * scaleY,
+      width: overlayW * scaleX,
+      height: "auto",
+      pointerEvents: "none",
     }
   }, [videoDimensions, overlayImage, size, getOverlayCoords])
 
@@ -422,53 +370,72 @@ function VideoStudioContent() {
     <div className="flex min-h-screen bg-[#0B0F1A] dark">
       <SidebarNav mode="creator" />
 
-      {/* Hidden elements for processing */}
+      {/* Hidden processing elements */}
       <video ref={hiddenVideoRef} className="hidden" playsInline crossOrigin="anonymous" />
       <canvas ref={canvasRef} className="hidden" />
 
-      <main className="flex-1 p-6 lg:p-8">
-        {/* Header with campaign context */}
-        <div className="mb-6">
-          {isFromCampaign ? (
-            <div className="flex items-center gap-4 mb-4">
-              <Link
-                href="/marketplace"
-                className="flex items-center gap-2 text-sm text-[#8892A8] hover:text-[#E2E8F0] transition-colors"
-              >
-                <ArrowLeft size={16} />
-                Back to Marketplace
-              </Link>
-            </div>
-          ) : null}
-          
+      <main className="flex-1 p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             {isFromCampaign && (
-              <div className="w-10 h-10 rounded-xl bg-[#6C5CE720] flex items-center justify-center">
-                <Zap size={20} className="text-[#6C5CE7]" />
-              </div>
+              <Link
+                href="/marketplace"
+                className="flex items-center gap-1.5 text-sm text-[#8892A8] hover:text-[#E2E8F0] transition-colors"
+              >
+                <ArrowLeft size={16} />
+              </Link>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-[#E2E8F0]">
-                {isFromCampaign ? `${campaignBrand} Campaign` : "Video Studio"}
+              <h1 className="text-xl font-bold text-[#E2E8F0]">
+                {isFromCampaign ? `Apply to ${campaignBrand}` : "Video Studio"}
               </h1>
-              <p className="text-[#8892A8] mt-0.5 text-sm">
-                {isFromCampaign
-                  ? "Upload your video to apply the brand overlay and submit"
-                  : "Overlay brand assets onto your video content"}
+              <p className="text-sm text-[#8892A8]">
+                Overlay brand assets onto your video
               </p>
             </div>
           </div>
+          <Button
+            onClick={processingState === "success" ? handleProcessAgain : handleProcess}
+            disabled={processingState === "success" ? false : !canProcess}
+            className={cn(
+              "font-semibold",
+              processingState === "success"
+                ? "bg-[#2A3050] hover:bg-[#363d5a] text-[#E2E8F0]"
+                : "bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white"
+            )}
+          >
+            {processingState === "processing" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {processingProgress}%
+              </>
+            ) : processingState === "success" ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Edit Again
+              </>
+            ) : (
+              "Process Video"
+            )}
+          </Button>
         </div>
 
+        {/* Two-column layout */}
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left Panel: Upload and Configure (60%) */}
-          <div className="lg:w-[60%] space-y-6">
+          {/* Left: Controls */}
+          <div className="lg:w-[55%] space-y-4">
             {/* Video Upload */}
-            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-5">
-              <h2 className="text-sm font-semibold text-[#E2E8F0] mb-3">
-                {isFromCampaign ? "Upload Your Video" : "Video Upload"}
-              </h2>
-              {!videoFile ? (
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-4">
+              <h3 className="text-sm font-semibold text-[#E2E8F0] mb-3">Video</h3>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleVideoSelect(e.target.files[0])}
+              />
+              {!videoPreviewUrl ? (
                 <div
                   onClick={() => videoInputRef.current?.click()}
                   onDragOver={(e) => e.preventDefault()}
@@ -477,395 +444,241 @@ function VideoStudioContent() {
                     const file = e.dataTransfer.files[0]
                     if (file) handleVideoSelect(file)
                   }}
-                  className="border-2 border-dashed border-[#2A3050] rounded-lg p-8 text-center cursor-pointer hover:border-[#6C5CE7] hover:bg-[#6C5CE710] transition-colors"
+                  className="h-24 border-2 border-dashed border-[#2A3050] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#6C5CE7] transition-colors"
                 >
-                  <Upload className="mx-auto h-10 w-10 text-[#8892A8] mb-3" />
-                  <p className="text-sm text-[#E2E8F0] font-medium">
-                    Drop your video here or click to browse
-                  </p>
-                  <p className="text-xs text-[#8892A8] mt-1">
-                    MP4, MOV, or WebM up to 100MB
-                  </p>
+                  <Upload size={20} className="text-[#8892A8] mb-1" />
+                  <span className="text-sm text-[#8892A8]">Upload video (max 100MB)</span>
                 </div>
               ) : (
-                <div className="flex items-start gap-4 p-4 bg-[#0B0F1A] rounded-lg">
-                  {videoPreviewUrl && (
-                    <video
-                      src={videoPreviewUrl}
-                      className="w-24 h-16 object-cover rounded"
-                      muted
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#E2E8F0] truncate">
-                      {videoFile.name}
-                    </p>
-                    <p className="text-xs text-[#8892A8]">
-                      {formatFileSize(videoFile.size)}
-                    </p>
+                <div className="flex items-center gap-3 p-3 bg-[#0B0F1A] rounded-lg">
+                  <div className="w-10 h-10 bg-[#6C5CE720] rounded flex items-center justify-center">
+                    <Upload size={16} className="text-[#6C5CE7]" />
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleClearVideo}
-                    className="shrink-0 text-[#8892A8] hover:text-[#E2E8F0]"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-[#E2E8F0] truncate">{videoFile?.name}</p>
+                    <p className="text-xs text-[#8892A8]">{videoFile && (videoFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                  </div>
+                  <button onClick={handleClearVideo} className="text-[#8892A8] hover:text-[#FF6B6B]">
+                    <X size={16} />
+                  </button>
                 </div>
               )}
-              <input
-                ref={videoInputRef}
-                type="file"
-                accept="video/mp4,video/quicktime,video/webm"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) handleVideoSelect(file)
-                }}
-              />
             </div>
 
             {/* Brand Asset */}
-            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-5">
-              <h2 className="text-sm font-semibold text-[#E2E8F0] mb-3">Brand Asset</h2>
-              {!overlayPreviewUrl ? (
-                <div className="space-y-3">
-                  <div
-                    onClick={() => overlayInputRef.current?.click()}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      const file = e.dataTransfer.files[0]
-                      if (file) handleOverlaySelect(file)
-                    }}
-                    className="border-2 border-dashed border-[#2A3050] rounded-lg p-6 text-center cursor-pointer hover:border-[#6C5CE7] hover:bg-[#6C5CE710] transition-colors"
-                  >
-                    <ImageIcon className="mx-auto h-8 w-8 text-[#8892A8] mb-2" />
-                    <p className="text-sm text-[#E2E8F0] font-medium">
-                      Drop your brand asset here
-                    </p>
-                    <p className="text-xs text-[#8892A8] mt-1">
-                      PNG, JPG, GIF, or WebP
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4 p-4 bg-[#0B0F1A] rounded-lg">
-                  <div className="w-16 h-12 bg-white rounded-lg flex items-center justify-center p-2">
-                    <Image
-                      src={overlayPreviewUrl}
-                      alt="Overlay preview"
-                      width={56}
-                      height={40}
-                      className="object-contain max-h-full"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#E2E8F0] truncate">
-                      {isPreloaded ? `${campaignBrand} Brand Asset` : overlayFile?.name || "Brand Overlay"}
-                    </p>
-                    {isPreloaded && (
-                      <p className="text-xs text-[#6C5CE7]">Preloaded from campaign</p>
-                    )}
-                  </div>
-                  {!isPreloaded && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleClearOverlay}
-                      className="shrink-0 text-[#8892A8] hover:text-[#E2E8F0]"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              )}
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-4">
+              <h3 className="text-sm font-semibold text-[#E2E8F0] mb-3">Brand Asset</h3>
               <input
                 ref={overlayInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
+                accept="image/*"
                 className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) handleOverlaySelect(file)
-                }}
+                onChange={(e) => e.target.files?.[0] && handleOverlaySelect(e.target.files[0])}
               />
+              {!overlayPreviewUrl ? (
+                <div
+                  onClick={() => overlayInputRef.current?.click()}
+                  className="h-24 border-2 border-dashed border-[#2A3050] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#6C5CE7] transition-colors"
+                >
+                  <ImageIcon size={20} className="text-[#8892A8] mb-1" />
+                  <span className="text-sm text-[#8892A8]">Upload PNG or JPG</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-3 bg-[#0B0F1A] rounded-lg">
+                  <div className="w-12 h-12 bg-white rounded flex items-center justify-center overflow-hidden">
+                    <img src={overlayPreviewUrl} alt="Overlay" className="object-contain w-full h-full" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-[#E2E8F0] truncate">
+                      {isFromCampaign ? `${campaignBrand} Asset` : overlayFile?.name}
+                    </p>
+                    {isFromCampaign && <p className="text-xs text-[#8892A8]">Campaign asset</p>}
+                  </div>
+                  {!isFromCampaign && (
+                    <button onClick={handleClearOverlay} className="text-[#8892A8] hover:text-[#FF6B6B]">
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Overlay Settings */}
-            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-5 space-y-5">
-              <h2 className="text-sm font-semibold text-[#E2E8F0]">Overlay Settings</h2>
+            <div className="bg-[#131825] rounded-xl border border-[#2A3050] p-4">
+              <h3 className="text-sm font-semibold text-[#E2E8F0] mb-3">Overlay Settings</h3>
 
               {/* Position Mode Toggle */}
-              <div>
-                <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider mb-2 block">
-                  Position Mode
-                </label>
-                <div className="flex items-center bg-[#0B0F1A] rounded-lg p-1 w-fit">
-                  <button
-                    onClick={() => setPositionMode("grid")}
-                    className={cn(
-                      "flex items-center gap-2 py-2 px-3 text-xs font-semibold rounded-md transition-all",
-                      positionMode === "grid"
-                        ? "bg-[#6C5CE7] text-white"
-                        : "text-[#8892A8] hover:text-[#E2E8F0]"
-                    )}
-                  >
-                    <Grid3X3 size={14} />
-                    Grid
-                  </button>
-                  <button
-                    onClick={() => setPositionMode("advanced")}
-                    className={cn(
-                      "flex items-center gap-2 py-2 px-3 text-xs font-semibold rounded-md transition-all",
-                      positionMode === "advanced"
-                        ? "bg-[#6C5CE7] text-white"
-                        : "text-[#8892A8] hover:text-[#E2E8F0]"
-                    )}
-                  >
-                    <Settings2 size={14} />
-                    Advanced
-                  </button>
-                </div>
+              <div className="flex gap-1 mb-3">
+                <button
+                  onClick={() => setPositionMode("grid")}
+                  className={cn(
+                    "flex-1 py-1.5 text-xs font-medium rounded transition-colors",
+                    positionMode === "grid" ? "bg-[#6C5CE7] text-white" : "bg-[#1A2035] text-[#8892A8] hover:text-[#E2E8F0]"
+                  )}
+                >
+                  Grid
+                </button>
+                <button
+                  onClick={() => setPositionMode("advanced")}
+                  className={cn(
+                    "flex-1 py-1.5 text-xs font-medium rounded transition-colors",
+                    positionMode === "advanced" ? "bg-[#6C5CE7] text-white" : "bg-[#1A2035] text-[#8892A8] hover:text-[#E2E8F0]"
+                  )}
+                >
+                  Advanced
+                </button>
               </div>
 
-              {/* Grid Position */}
-              {positionMode === "grid" && (
-                <div>
-                  <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
-                    Position
-                  </label>
-                  <div className="mt-2 grid grid-cols-3 gap-1.5 w-36">
-                    {POSITION_GRID.flat().map((pos) => (
-                      <button
-                        key={pos}
-                        onClick={() => setPosition(pos)}
-                        className={cn(
-                          "w-10 h-10 rounded border-2 transition-colors",
-                          position === pos
-                            ? "bg-[#6C5CE7] border-[#6C5CE7]"
-                            : "bg-[#0B0F1A] border-[#2A3050] hover:border-[#6C5CE7]/50"
-                        )}
-                        aria-label={POSITION_LABELS[pos]}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs text-[#8892A8] mt-2">
-                    {POSITION_LABELS[position]}
-                  </p>
+              {positionMode === "grid" ? (
+                <div className="grid grid-cols-3 gap-1.5 mb-4">
+                  {POSITION_GRID.flat().map((pos) => (
+                    <button
+                      key={pos}
+                      onClick={() => setPosition(pos)}
+                      className={cn(
+                        "py-2 text-xs font-medium rounded transition-colors",
+                        position === pos ? "bg-[#6C5CE7] text-white" : "bg-[#1A2035] text-[#8892A8] hover:text-[#E2E8F0]"
+                      )}
+                    >
+                      {POSITION_LABELS[pos]}
+                    </button>
+                  ))}
                 </div>
-              )}
-
-              {/* Advanced Position Controls */}
-              {positionMode === "advanced" && (
-                <div className="space-y-4">
+              ) : (
+                <div className="space-y-3 mb-4">
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
-                        X Position (from left)
-                      </label>
-                      <span className="text-xs font-mono text-[#E2E8F0]">{customX}%</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Slider
-                        value={[customX]}
-                        onValueChange={([val]) => setCustomX(val)}
-                        min={0}
-                        max={100}
-                        step={1}
-                        className="flex-1"
-                      />
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-[#8892A8]">X Position</span>
                       <Input
                         type="number"
                         value={customX}
                         onChange={(e) => setCustomX(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-16 h-8 text-xs bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0]"
+                        className="w-14 h-6 text-xs bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0] text-center"
                       />
                     </div>
+                    <Slider value={[customX]} onValueChange={([v]) => setCustomX(v)} max={100} step={1} />
                   </div>
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
-                        Y Position (from top)
-                      </label>
-                      <span className="text-xs font-mono text-[#E2E8F0]">{customY}%</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Slider
-                        value={[customY]}
-                        onValueChange={([val]) => setCustomY(val)}
-                        min={0}
-                        max={100}
-                        step={1}
-                        className="flex-1"
-                      />
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-[#8892A8]">Y Position</span>
                       <Input
                         type="number"
                         value={customY}
                         onChange={(e) => setCustomY(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-16 h-8 text-xs bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0]"
+                        className="w-14 h-6 text-xs bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0] text-center"
                       />
                     </div>
+                    <Slider value={[customY]} onValueChange={([v]) => setCustomY(v)} max={100} step={1} />
                   </div>
                 </div>
               )}
 
-              {/* Size Slider */}
+              {/* Size */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium text-[#8892A8] uppercase tracking-wider">
-                    Size
-                  </label>
-                  <span className="text-xs font-mono text-[#E2E8F0]">{size}%</span>
+                <div className="flex justify-between mb-1">
+                  <span className="text-xs text-[#8892A8]">Size</span>
+                  <span className="text-xs text-[#E2E8F0]">{size}%</span>
                 </div>
-                <Slider
-                  value={[size]}
-                  onValueChange={([val]) => setSize(val)}
-                  min={5}
-                  max={50}
-                  step={1}
-                  className="w-full"
-                />
+                <Slider value={[size]} onValueChange={([v]) => setSize(v)} min={10} max={100} step={5} />
               </div>
             </div>
-
-            {/* Process Button */}
-            <Button
-              onClick={handleProcess}
-              disabled={!canProcess}
-              className="w-full bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white py-6 text-base font-semibold disabled:opacity-50"
-            >
-              {processingState === "processing" ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processing... {processingProgress}%
-                </>
-              ) : (
-                <>
-                  <Zap className="mr-2 h-5 w-5" />
-                  {isFromCampaign ? "Create & Submit" : "Process Video"}
-                </>
-              )}
-            </Button>
           </div>
 
-          {/* Right Panel: Preview / Result (40%) */}
-          <div className="lg:w-[40%]">
-            <div className="sticky top-6">
-              <div className="bg-[#131825] rounded-xl border border-[#2A3050] overflow-hidden">
-                <div className="px-5 py-4 border-b border-[#2A3050]">
-                  <h2 className="text-sm font-semibold text-[#E2E8F0]">
+          {/* Right: Preview — portrait (9:16) to match short-form video */}
+          <div className="lg:w-[45%] flex justify-center">
+            <div className="w-full max-w-[340px]">
+              <div className="bg-[#131825] rounded-xl border border-[#2A3050]">
+                <div className="px-4 py-3 border-b border-[#2A3050]">
+                  <h3 className="text-sm font-semibold text-[#E2E8F0]">
                     {processingState === "success" ? "Result" : "Preview"}
-                  </h2>
+                  </h3>
                 </div>
 
-                <div className="p-5">
-                  {/* Idle state */}
-                  {processingState === "idle" && !videoPreviewUrl && (
-                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center text-[#8892A8]">
-                      <Upload size={32} className="mb-3 opacity-40" />
-                      <p className="text-sm font-medium">Upload a video to preview</p>
-                    </div>
-                  )}
+                <div className="p-4">
+                  {/* 9:16 portrait container */}
+                  <div
+                    ref={previewContainerRef}
+                    className="relative w-full bg-[#0B0F1A] rounded-lg overflow-hidden"
+                    style={{ aspectRatio: "9/16" }}
+                  >
+                    {/* Idle – no video */}
+                    {processingState !== "success" && !videoPreviewUrl && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-[#8892A8]">
+                        <Upload size={28} className="mb-2 opacity-50" />
+                        <p className="text-sm">Upload a video to preview</p>
+                      </div>
+                    )}
 
-                  {/* Preview with video */}
-                  {processingState === "idle" && videoPreviewUrl && (
-                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg overflow-hidden relative">
-                      <video
-                        ref={previewVideoRef}
-                        src={videoPreviewUrl}
-                        className="w-full h-full object-contain"
-                        controls
-                        muted
-                        onLoadedMetadata={handleVideoMetadata}
-                      />
-                      {overlayImage && videoDimensions && (
-                        <div
-                          className="absolute pointer-events-none"
-                          style={getPreviewOverlayStyles()}
-                        >
-                          <Image
+                    {/* Video preview with overlay */}
+                    {processingState !== "success" && videoPreviewUrl && (
+                      <>
+                        <video
+                          ref={previewVideoRef}
+                          src={videoPreviewUrl}
+                          className="absolute inset-0 w-full h-full object-contain"
+                          controls={processingState === "idle"}
+                          muted
+                          onLoadedMetadata={handleVideoMetadata}
+                        />
+                        {overlayImage && videoDimensions && processingState === "idle" && (
+                          <img
                             src={overlayPreviewUrl || ""}
                             alt="Overlay"
-                            width={200}
-                            height={100}
-                            className="w-full h-auto object-contain"
+                            style={getPreviewOverlayStyles()}
                           />
+                        )}
+                        {/* Processing overlay */}
+                        {processingState === "processing" && (
+                          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
+                            <Loader2 size={32} className="text-[#6C5CE7] animate-spin mb-3" />
+                            <p className="text-sm text-white mb-2">Processing...</p>
+                            <div className="w-32 h-1.5 bg-[#2A3050] rounded-full overflow-hidden">
+                              <div className="h-full bg-[#6C5CE7] transition-all" style={{ width: `${processingProgress}%` }} />
+                            </div>
+                            <p className="text-xs text-[#8892A8] mt-1">{processingProgress}%</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Success result */}
+                    {processingState === "success" && resultUrl && (
+                      <>
+                        <video src={resultUrl} className="absolute inset-0 w-full h-full object-contain" controls />
+                        <div className="absolute top-2 left-2 flex items-center gap-1 bg-[#00B89490] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                          <CheckCircle2 size={12} />
+                          Done
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </>
+                    )}
 
-                  {/* Processing state */}
-                  {processingState === "processing" && (
-                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center">
-                      <Loader2 size={48} className="text-[#6C5CE7] animate-spin mb-4" />
-                      <p className="text-sm font-medium text-[#E2E8F0] mb-2">Processing video...</p>
-                      <div className="w-48 h-2 bg-[#2A3050] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#6C5CE7] transition-all duration-300"
-                          style={{ width: `${processingProgress}%` }}
-                        />
+                    {/* Error state */}
+                    {processingState === "error" && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <AlertCircle size={28} className="text-[#FF6B6B] mb-2" />
+                        <p className="text-sm text-[#E2E8F0] mb-1">Failed</p>
+                        <p className="text-xs text-[#8892A8] text-center px-4">{errorMessage}</p>
                       </div>
-                      <p className="text-xs text-[#8892A8] mt-2">{processingProgress}% complete</p>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  {/* Success state */}
-                  {processingState === "success" && resultUrl && (
-                    <div className="space-y-4">
-                      <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg overflow-hidden">
-                        <video
-                          src={resultUrl}
-                          className="w-full h-full object-contain"
-                          controls
-                        />
-                      </div>
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={handleDownload}
-                          className="flex-1 bg-[#00B894] hover:bg-[#00a383] text-white"
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Download
-                        </Button>
-                        <Button
-                          onClick={handleProcessAgain}
-                          variant="outline"
-                          className="border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0]"
-                        >
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Edit
-                        </Button>
-                      </div>
-                      {/* Publish Button */}
-                      <Button
-                        onClick={handlePublish}
-                        className="w-full bg-[#00B894] hover:bg-[#00a383] text-white"
-                      >
+                  {/* Action buttons */}
+                  {processingState === "success" && (
+                    <div className="mt-4 space-y-2">
+                      <Button onClick={handleDownload} className="w-full bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white">
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </Button>
+                      <Button onClick={handlePublish} className="w-full bg-[#00B894] hover:bg-[#00a383] text-white">
                         <Send className="mr-2 h-4 w-4" />
                         Publish (@YourChannelName)
                       </Button>
-                      {isFromCampaign && (
-                        <p className="text-xs text-[#8892A8] text-center">
-                          Download your video and upload it to {campaignBrand}&apos;s preferred platform
-                        </p>
-                      )}
                     </div>
                   )}
 
-                  {/* Error state */}
                   {processingState === "error" && (
-                    <div className="aspect-[9/16] bg-[#0B0F1A] rounded-lg flex flex-col items-center justify-center p-6">
-                      <AlertCircle size={48} className="text-[#FF6B6B] mb-4" />
-                      <p className="text-sm font-medium text-[#E2E8F0] mb-2">Processing Failed</p>
-                      <p className="text-xs text-[#8892A8] text-center mb-4">{errorMessage}</p>
-                      <Button
-                        onClick={() => setProcessingState("idle")}
-                        variant="outline"
-                        className="border-[#2A3050] text-[#8892A8] hover:text-[#E2E8F0]"
-                      >
+                    <div className="mt-4">
+                      <Button onClick={() => setProcessingState("idle")} variant="outline" className="w-full border-[#2A3050] text-[#8892A8]">
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Try Again
                       </Button>
@@ -884,8 +697,8 @@ function VideoStudioContent() {
 export default function VideoStudioPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen bg-[#0B0F1A] dark items-center justify-center">
-        <Loader2 size={32} className="text-[#6C5CE7] animate-spin" />
+      <div className="flex min-h-screen bg-[#0B0F1A] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#6C5CE7]" />
       </div>
     }>
       <VideoStudioContent />
