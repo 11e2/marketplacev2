@@ -4,18 +4,31 @@ import { existsSync } from "fs"
 import { join } from "path"
 import { execFile } from "child_process"
 import { randomUUID } from "crypto"
-import ffmpegPath from "ffmpeg-static"
-import ffprobePath from "ffprobe-static"
 
-// Next.js App Router: allow up to 500MB uploads
-export const maxDuration = 120
+// Dynamically resolve FFmpeg and FFprobe paths
+let FFMPEG_PATH: string | null = null
+let FFPROBE_PATH: string | null = null
 
-// Resolve binary paths - ffmpeg-static exports the path directly, ffprobe-static exports an object
-const FFMPEG_PATH = ffmpegPath || "ffmpeg"
-const FFPROBE_PATH = typeof ffprobePath === "string" ? ffprobePath : ffprobePath?.path || "ffprobe"
+try {
+  const ffmpegStatic = require("ffmpeg-static")
+  FFMPEG_PATH = ffmpegStatic
+} catch {
+  FFMPEG_PATH = null
+}
+
+try {
+  const ffprobeStatic = require("ffprobe-static")
+  // ffprobe-static exports an object with a `path` property in v3.1.0
+  FFPROBE_PATH = typeof ffprobeStatic === "string" ? ffprobeStatic : ffprobeStatic.path
+} catch {
+  FFPROBE_PATH = null
+}
 
 const TEMP_DIR = "/tmp/marketingplace"
 const FFMPEG_TIMEOUT = 120_000
+
+// Next.js App Router: allow up to 500MB uploads
+export const maxDuration = 120
 
 const VALID_VIDEO_EXTENSIONS = [".mp4", ".mov", ".webm"]
 const VALID_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"]
@@ -105,18 +118,38 @@ async function cleanupFiles(...paths: string[]) {
 }
 
 export async function POST(request: Request) {
+  // Debug: Log binary paths
+  console.log("[v0] FFMPEG_PATH:", FFMPEG_PATH)
+  console.log("[v0] FFPROBE_PATH:", FFPROBE_PATH)
+  console.log("[v0] FFMPEG exists:", FFMPEG_PATH ? existsSync(FFMPEG_PATH) : false)
+  console.log("[v0] FFPROBE exists:", FFPROBE_PATH ? existsSync(FFPROBE_PATH) : false)
+
   // Check FFmpeg availability
-  if (!FFMPEG_PATH || !existsSync(FFMPEG_PATH)) {
-    console.error("[v0] FFmpeg binary not found at:", FFMPEG_PATH)
+  if (!FFMPEG_PATH) {
+    console.error("[v0] FFmpeg not found - ffmpeg-static package failed to load")
     return NextResponse.json(
-      { error: "FFmpeg is not available on this system" },
+      { error: "FFmpeg package failed to load" },
       { status: 500 }
     )
   }
-  if (!FFPROBE_PATH || !existsSync(FFPROBE_PATH)) {
+  if (!existsSync(FFMPEG_PATH)) {
+    console.error("[v0] FFmpeg binary not found at:", FFMPEG_PATH)
+    return NextResponse.json(
+      { error: `FFmpeg binary not found at ${FFMPEG_PATH}` },
+      { status: 500 }
+    )
+  }
+  if (!FFPROBE_PATH) {
+    console.error("[v0] FFprobe not found - ffprobe-static package failed to load")
+    return NextResponse.json(
+      { error: "FFprobe package failed to load" },
+      { status: 500 }
+    )
+  }
+  if (!existsSync(FFPROBE_PATH)) {
     console.error("[v0] FFprobe binary not found at:", FFPROBE_PATH)
     return NextResponse.json(
-      { error: "FFprobe is not available on this system" },
+      { error: `FFprobe binary not found at ${FFPROBE_PATH}` },
       { status: 500 }
     )
   }
