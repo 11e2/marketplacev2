@@ -66,7 +66,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("campaigns")
       .select(
-        "id, brand_user_id, title, description, type, status, channels, cpm, min_followers, min_views, total_budget, remaining_budget, spots, spots_remaining, brand_asset_url, accent_color, created_at, updated_at, owner:profiles!campaigns_brand_user_id_fkey(name, avatar_url), brand:brand_profiles!brand_profiles_user_id_fkey(company_name, logo_url, is_verified)",
+        "id, brand_user_id, title, description, type, status, channels, cpm, min_followers, min_views, total_budget, remaining_budget, spots, spots_remaining, brand_asset_url, accent_color, created_at, updated_at, owner:profiles!campaigns_brand_user_id_fkey(name, avatar_url)",
       )
       .order("created_at", { ascending: false })
       .limit(q.limit)

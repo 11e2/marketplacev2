@@ -30,10 +30,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const { data, error } = await supabase
       .from("campaigns")
       .select(
-        "id, brand_user_id, title, description, type, status, channels, cpm, min_followers, min_views, total_budget, remaining_budget, spots, spots_remaining, brand_asset_url, accent_color, created_at, updated_at, owner:profiles!campaigns_brand_user_id_fkey(name, avatar_url), brand:brand_profiles!brand_profiles_user_id_fkey(company_name, logo_url, website, industry, is_verified)",
+        "id, brand_user_id, title, description, type, status, channels, cpm, min_followers, min_views, total_budget, remaining_budget, spots, spots_remaining, brand_asset_url, accent_color, created_at, updated_at, owner:profiles!campaigns_brand_user_id_fkey(name, avatar_url)",
       )
       .eq("id", id)
       .maybeSingle()
+
+    // Fetch brand_profile separately since there's no direct FK from campaigns to brand_profiles.
+    let brand: Record<string, unknown> | null = null
+    if (data?.brand_user_id) {
+      const { data: bp } = await supabase
+        .from("brand_profiles")
+        .select("company_name, logo_url, website, industry, is_verified")
+        .eq("user_id", data.brand_user_id)
+        .maybeSingle()
+      brand = bp
+    }
     if (error) throw new ApiError("INTERNAL", error.message)
     if (!data) throw new ApiError("NOT_FOUND", "Campaign not found")
 
@@ -44,6 +55,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({
       campaign: {
         ...data,
+        brand,
         percentBudgetUsed,
         spotsRemaining: data.spots_remaining ?? data.spots ?? null,
       },

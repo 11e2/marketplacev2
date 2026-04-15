@@ -167,7 +167,7 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
               {user?.name || (loaded ? "Guest" : "Loading...")}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {user ? role.charAt(0) + role.slice(1).toLowerCase() : ""}
+              {user && role ? role.charAt(0) + role.slice(1).toLowerCase() : ""}
             </p>
           </div>
         </div>
