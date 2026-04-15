@@ -36,12 +36,12 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="dark flex min-h-screen bg-[#0B0F1A] text-[#E2E8F0]">
       <SidebarNav />
       <main className="flex-1 px-8 py-10">
         <div className="max-w-3xl">
-          <h1 className="text-3xl font-bold mb-1">Settings</h1>
-          <p className="text-sm text-muted-foreground mb-8">
+          <h1 className="text-3xl font-bold mb-1 text-white">Settings</h1>
+          <p className="text-sm text-[#8892A8] mb-8">
             Manage your account, security, and notification preferences.
           </p>
           <SettingsTabs

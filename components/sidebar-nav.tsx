@@ -28,7 +28,6 @@ const creatorNav = [
   { label: "Messages", href: "/messaging", icon: MessageSquare },
   { label: "Analytics", href: "/analytics", icon: BarChart2 },
   { label: "Payouts", href: "/earnings", icon: Wallet },
-  { label: "Settings", href: "/settings", icon: Settings },
 ]
 
 const brandNav = [
@@ -38,7 +37,6 @@ const brandNav = [
   { label: "Creators", href: "/marketplace", icon: Store },
   { label: "Messages", href: "/messaging", icon: MessageSquare },
   { label: "Payouts", href: "/coming-soon", icon: Wallet },
-  { label: "Settings", href: "/settings", icon: Settings },
 ]
 
 interface SidebarUser {
