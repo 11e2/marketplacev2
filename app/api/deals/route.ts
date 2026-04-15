@@ -112,16 +112,6 @@ export async function POST(request: Request) {
       throw new ApiError("FORBIDDEN", "Only brands can create deals")
     }
 
-    // Check sufficient balance before insert
-    const { data: balance } = await supabase
-      .from("balances")
-      .select("available")
-      .eq("user_id", user.id)
-      .maybeSingle()
-    if (Number(balance?.available ?? 0) < input.agreedRate) {
-      throw new ApiError("BAD_REQUEST", "Insufficient balance to fund escrow")
-    }
-
     const svc = createServiceSupabase()
     const { data: deal, error } = await svc
       .from("deals")
@@ -139,7 +129,12 @@ export async function POST(request: Request) {
       .single()
     if (error || !deal) throw new ApiError("INTERNAL", error?.message ?? "Failed to create deal")
 
-    await escrowHold(user.id, deal.id, input.agreedRate)
+    try {
+      await escrowHold(user.id, deal.id, input.agreedRate)
+    } catch (escrowErr) {
+      await svc.from("deals").delete().eq("id", deal.id)
+      throw escrowErr
+    }
 
     if (input.applicationId) {
       await svc

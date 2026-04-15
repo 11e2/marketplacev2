@@ -82,15 +82,19 @@ export const proposalSchema = z.object({
   message: z.string().max(2000).optional(),
 })
 
-export const createDealSchema = z.object({
-  applicationId: uuid.optional(),
-  creatorUserId: uuid.optional(),
-  campaignId: uuid.optional(),
-  agreedRate: z.number().positive(),
-  rateType: rateType.default("FLAT"),
-  deliverables: z.array(z.object({ name: z.string(), detail: z.string().optional() })).default([]),
-  deadline: z.string().datetime().optional(),
-})
+export const createDealSchema = z
+  .object({
+    applicationId: uuid.optional(),
+    creatorUserId: uuid.optional(),
+    campaignId: uuid.optional(),
+    agreedRate: z.number().positive(),
+    rateType: rateType.default("FLAT"),
+    deliverables: z.array(z.object({ name: z.string(), detail: z.string().optional() })).default([]),
+    deadline: z.string().datetime().optional(),
+  })
+  .refine((d) => d.applicationId || d.creatorUserId, {
+    message: "applicationId or creatorUserId is required",
+  })
 
 export const dealTransition = z.object({
   status: z.enum(["ACCEPTED", "IN_PROGRESS", "DELIVERED", "APPROVED", "DISPUTED", "COMPLETED", "CANCELLED"]),

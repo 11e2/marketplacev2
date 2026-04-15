@@ -3,14 +3,28 @@ import { createServerSupabase, createServiceSupabase } from "@/lib/supabase-serv
 import { ApiError, handleApiError } from "@/lib/errors"
 import { submissionSchema } from "@/lib/validation"
 
+async function assertParticipant(id: string) {
+  const supabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new ApiError("UNAUTHORIZED", "Not signed in")
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("brand_user_id, creator_user_id, status")
+    .eq("id", id)
+    .maybeSingle()
+  if (!deal) throw new ApiError("NOT_FOUND", "Deal not found")
+  if (deal.brand_user_id !== user.id && deal.creator_user_id !== user.id) {
+    throw new ApiError("FORBIDDEN", "Not a deal participant")
+  }
+  return { supabase, user, deal }
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabase()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) throw new ApiError("UNAUTHORIZED", "Not signed in")
+    const { supabase } = await assertParticipant(id)
 
     const { data, error } = await supabase
       .from("submissions")
@@ -36,21 +50,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabase()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) throw new ApiError("UNAUTHORIZED", "Not signed in")
+    const { supabase, user, deal } = await assertParticipant(id)
 
     const input = submissionSchema.parse(await request.json())
 
-    const { data: deal } = await supabase
-      .from("deals")
-      .select("creator_user_id, status")
-      .eq("id", id)
-      .maybeSingle()
-    if (!deal) throw new ApiError("NOT_FOUND", "Deal not found")
-    if (deal.creator_user_id !== user.id) throw new ApiError("FORBIDDEN", "Not your deal")
+    if (deal.creator_user_id !== user.id) throw new ApiError("FORBIDDEN", "Only the creator can submit")
+    if (deal.status !== "IN_PROGRESS") throw new ApiError("BAD_REQUEST", "Deal must be IN_PROGRESS to submit")
 
     const { data, error } = await supabase
       .from("submissions")

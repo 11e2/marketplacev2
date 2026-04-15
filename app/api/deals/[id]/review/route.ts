@@ -37,7 +37,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       })
       .select("id")
       .single()
-    if (error || !data) throw new ApiError("INTERNAL", error?.message ?? "Failed to create review")
+    if (error) {
+      if (error.code === "23505") throw new ApiError("CONFLICT", "You have already reviewed this deal")
+      throw new ApiError("INTERNAL", error.message)
+    }
+    if (!data) throw new ApiError("INTERNAL", "Failed to create review")
 
     return NextResponse.json({ id: data.id }, { status: 201 })
   } catch (err) {
