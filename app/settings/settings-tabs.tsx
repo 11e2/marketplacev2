@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createBrowserSupabase } from "@/lib/supabase-browser"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 
 interface ProfileData {
   email: string
@@ -360,20 +361,30 @@ function AccountTab({ email }: { email: string }) {
   const router = useRouter()
   const [confirm, setConfirm] = useState("")
   const [loading, setLoading] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [typedDelete, setTypedDelete] = useState("")
 
   async function onDelete() {
-    if (confirm !== email) return toast.error("Type your email exactly to confirm")
-    if (!window.confirm("This permanently deletes your account and data. Continue?")) return
     setLoading(true)
     const res = await fetch("/api/users/me/delete", { method: "POST" })
     setLoading(false)
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
-      return toast.error(j?.error?.message || "Failed to delete account")
+      toast.error(j?.error?.message || "Failed to delete account")
+      return
     }
     toast.success("Account deleted")
     router.push("/")
     router.refresh()
+  }
+
+  function requestDelete() {
+    if (confirm !== email) {
+      toast.error("Type your email exactly to confirm")
+      return
+    }
+    setTypedDelete("")
+    setDialogOpen(true)
   }
 
   return (
@@ -391,10 +402,37 @@ function AccountTab({ email }: { email: string }) {
           placeholder={email}
           className={inputCls}
         />
-        <button onClick={onDelete} disabled={loading || confirm !== email} className={btnDanger}>
+        <button onClick={requestDelete} disabled={loading || confirm !== email} className={btnDanger}>
           {loading ? "Deleting..." : "Delete my account"}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={dialogOpen}
+        onOpenChange={(v) => {
+          setDialogOpen(v)
+          if (!v) setTypedDelete("")
+        }}
+        title="Delete your account?"
+        description="This permanently removes your account, profile, deals, messages, submissions, and balances. This cannot be undone."
+        confirmLabel="Permanently delete"
+        variant="destructive"
+        confirmDisabled={typedDelete !== "DELETE"}
+        onConfirm={onDelete}
+      >
+        <div className="space-y-1.5">
+          <p className="text-xs text-[#8892A8]">
+            Type <span className="font-mono text-[#E2E8F0] font-semibold">DELETE</span> to enable the button.
+          </p>
+          <input
+            value={typedDelete}
+            onChange={(e) => setTypedDelete(e.target.value)}
+            autoFocus
+            placeholder="DELETE"
+            className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] placeholder:text-[#8892A8] outline-none focus:border-[#FF6B6B] transition-colors font-mono"
+          />
+        </div>
+      </ConfirmDialog>
     </Card>
   )
 }

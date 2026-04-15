@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Play, Pause, Trash2, Rocket } from "lucide-react"
 import { VerifiedBadge } from "@/components/verified-badge"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 
 interface Campaign {
   id: string
@@ -129,9 +130,9 @@ export function ManagePanel({ campaign: initial }: { campaign: Campaign }) {
     }
   }
 
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
   async function onDelete() {
-    const confirmText = isDraft ? "Delete this draft?" : "Archive this campaign? It will stop accepting new applications."
-    if (!window.confirm(confirmText)) return
     setSaving(true)
     const res = await fetch(`/api/campaigns/${campaign.id}`, { method: "DELETE" })
     setSaving(false)
@@ -203,7 +204,7 @@ export function ManagePanel({ campaign: initial }: { campaign: Campaign }) {
             )}
             {campaign.status !== "COMPLETED" && (
               <button
-                onClick={onDelete}
+                onClick={() => setDeleteOpen(true)}
                 disabled={saving}
                 className="flex items-center gap-1.5 border border-[#FF6B6B]/40 text-[#FF6B6B] hover:bg-[#FF6B6B]/10 text-sm font-semibold px-3 py-2 rounded-lg disabled:opacity-50"
               >
@@ -386,6 +387,20 @@ export function ManagePanel({ campaign: initial }: { campaign: Campaign }) {
           {saving ? "Saving..." : "Save changes"}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={isDraft ? "Delete this draft?" : "Archive this campaign?"}
+        description={
+          isDraft
+            ? "The draft and its unsaved settings will be removed. This cannot be undone."
+            : "The campaign will stop accepting new applications. Existing deals and submissions remain intact."
+        }
+        confirmLabel={isDraft ? "Delete" : "Archive"}
+        variant="destructive"
+        onConfirm={onDelete}
+      />
     </div>
   )
 }

@@ -27,6 +27,7 @@ export function ConfirmDialog({
   promptPlaceholder,
   promptMaxLength = 2000,
   requirePrompt = false,
+  confirmDisabled = false,
   onConfirm,
   children,
 }: {
@@ -41,6 +42,7 @@ export function ConfirmDialog({
   promptPlaceholder?: string
   promptMaxLength?: number
   requirePrompt?: boolean
+  confirmDisabled?: boolean
   onConfirm: (note?: string) => void | Promise<void>
   children?: ReactNode
 }) {
@@ -108,7 +110,7 @@ export function ConfirmDialog({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={busy || (requirePrompt && !note.trim())}
+            disabled={busy || confirmDisabled || (requirePrompt && !note.trim())}
             className={`text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-60 inline-flex items-center gap-2 ${confirmClass}`}
           >
             {busy && <Loader2 size={14} className="animate-spin" />}

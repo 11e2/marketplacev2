@@ -311,7 +311,7 @@ function VideoStudioContent() {
   }, [resultUrl])
 
   const handlePublish = useCallback(() => {
-    toast.success("Video ready to publish! Connect your account to post directly.")
+    toast.info("Ready to publish. Download the clip and post it from your connected account.")
   }, [])
 
   const [submitUrl, setSubmitUrl] = useState("")
