@@ -1,18 +1,57 @@
 "use client"
 
-import { useState } from "react"
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
 import { Search, Filter, ChevronDown, Zap, Sparkles, TrendingUp } from "lucide-react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState, SkeletonCard } from "@/components/empty-state"
 
 const filterPills = ["All", "Clipping", "TikTok", "Reels", "Shorts", "YouTube", "Twitter/X", "Discord", "Newsletter", "Podcast"]
 
+interface Campaign {
+  id: string
+  title: string
+  description: string
+  type: "CLIPPING" | "STANDARD"
+  status: "ACTIVE"
+  channels: string[]
+  cpm: number | null
+  total_budget: number
+  brand_asset_url: string | null
+  accent_color: string | null
+  owner: { name: string | null; avatar_url: string | null } | null
+  spotsRemaining: number | null
+}
+
 export default function MarketplacePage() {
   const [activeFilter, setActiveFilter] = useState("All")
   const [search, setSearch] = useState("")
-  // TODO(Phase 3): fetch from GET /api/campaigns
-  const isLoading = false
-  const campaigns: unknown[] = []
+  const [campaigns, setCampaigns] = useState<Campaign[] | null>(null)
+
+  useEffect(() => {
+    const qs = new URLSearchParams()
+    if (activeFilter === "Clipping") qs.set("type", "CLIPPING")
+    else if (activeFilter !== "All") qs.set("channel", activeFilter)
+    if (search.trim()) qs.set("search", search.trim())
+
+    const ctrl = new AbortController()
+    const t = setTimeout(() => {
+      setCampaigns(null)
+      fetch(`/api/campaigns?${qs}`, { signal: ctrl.signal, cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { items: [] }))
+        .then((j) => setCampaigns(j.items ?? []))
+        .catch((e) => {
+          if (e.name !== "AbortError") setCampaigns([])
+        })
+    }, 200)
+    return () => {
+      ctrl.abort()
+      clearTimeout(t)
+    }
+  }, [activeFilter, search])
+
+  const isLoading = campaigns === null
+  const items = useMemo(() => campaigns ?? [], [campaigns])
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
@@ -64,7 +103,7 @@ export default function MarketplacePage() {
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-[#E2E8F0]">Campaigns</h2>
-                <span className="text-sm text-[#8892A8]">{campaigns.length} available</span>
+                <span className="text-sm text-[#8892A8]">{items.length} available</span>
               </div>
 
               {isLoading ? (
@@ -74,12 +113,72 @@ export default function MarketplacePage() {
                   <SkeletonCard />
                   <SkeletonCard />
                 </div>
-              ) : (
+              ) : items.length === 0 ? (
                 <EmptyState
                   icon={Sparkles}
                   title="No campaigns yet"
                   description="Campaigns will appear here as brands publish them. Check back soon."
                 />
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {items.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/campaign/${c.id}`}
+                      className="bg-[#131825] border border-[#2A3050] rounded-2xl overflow-hidden hover:border-[#6C5CE7] transition-colors"
+                    >
+                      <div
+                        className="h-1"
+                        style={{ backgroundColor: c.accent_color || "#6C5CE7" }}
+                      />
+                      <div className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {c.owner?.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={c.owner.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-[#6C5CE7]/20 text-[#6C5CE7] flex items-center justify-center text-[10px] font-bold">
+                                {(c.owner?.name || "?").charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="text-xs font-semibold text-[#E2E8F0] truncate">
+                              {c.owner?.name || "Brand"}
+                            </span>
+                          </div>
+                          {c.type === "CLIPPING" && c.cpm != null && (
+                            <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-[#00B894]/20 text-[#00B894]">
+                              CPM ${c.cpm}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-bold text-[#E2E8F0] mb-1 line-clamp-1">{c.title}</h3>
+                        <p className="text-xs text-[#8892A8] line-clamp-2 mb-3">{c.description}</p>
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {c.channels.slice(0, 4).map((ch) => (
+                            <span
+                              key={ch}
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#6C5CE7]/15 text-[#6C5CE7]"
+                            >
+                              {ch}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between pt-3 border-t border-[#2A3050] text-xs">
+                          <span className="text-[#8892A8]">
+                            Budget:{" "}
+                            <span className="font-mono font-semibold text-[#E2E8F0]">
+                              ${Number(c.total_budget).toLocaleString()}
+                            </span>
+                          </span>
+                          <span className="bg-[#6C5CE7] text-white font-semibold px-3 py-1 rounded-md">
+                            View
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               )}
             </section>
           </main>
