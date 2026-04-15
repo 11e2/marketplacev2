@@ -26,10 +26,10 @@ export async function GET() {
 
     const svc = createServiceSupabase()
     const unread = new Map<string, number>()
-    const [{ data: msgs }, { data: bp }, { data: cp }, { data: links }] = await Promise.all([
+    const [{ data: unreadRows }, { data: bp }, { data: cp }, { data: links }] = await Promise.all([
       ids.length
-        ? supabase.from("messages").select("conversation_id, sender_id, read_at").in("conversation_id", ids)
-        : Promise.resolve({ data: [] as { conversation_id: string; sender_id: string; read_at: string | null }[] }),
+        ? supabase.rpc("conversation_unread_counts", { p_user_id: user.id, p_conv_ids: ids })
+        : Promise.resolve({ data: [] as { conversation_id: string; unread_count: number }[] }),
       brandIds.length
         ? supabase.from("brand_profiles").select("user_id, is_verified").in("user_id", brandIds)
         : Promise.resolve({ data: [] as { user_id: string; is_verified: boolean }[] }),
@@ -40,10 +40,8 @@ export async function GET() {
         ? svc.from("linked_accounts").select("user_id, is_verified").in("user_id", creatorIds).eq("is_verified", true)
         : Promise.resolve({ data: [] as { user_id: string; is_verified: boolean }[] }),
     ])
-    for (const m of msgs ?? []) {
-      if (m.sender_id !== user.id && !m.read_at) {
-        unread.set(m.conversation_id, (unread.get(m.conversation_id) ?? 0) + 1)
-      }
+    for (const row of unreadRows ?? []) {
+      unread.set(row.conversation_id, row.unread_count)
     }
     const brandVerified = new Map((bp ?? []).map((r) => [r.user_id, !!r.is_verified]))
     const creatorVerified = new Map((cp ?? []).map((r) => [r.user_id, !!r.is_verified]))

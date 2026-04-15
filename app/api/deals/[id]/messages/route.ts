@@ -44,8 +44,21 @@ async function participantContext(dealId: string) {
       })
       .select("id")
       .single()
-    if (error || !created) throw new ApiError("INTERNAL", error?.message ?? "Failed to create conversation")
-    convo = created
+    if (error) {
+      if (error.code === "23505") {
+        const { data: existing } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("deal_id", dealId)
+          .single()
+        if (!existing) throw new ApiError("INTERNAL", "Failed to resolve conversation")
+        convo = existing
+      } else {
+        throw new ApiError("INTERNAL", error.message)
+      }
+    } else {
+      convo = created
+    }
   }
 
   return { supabase, user, deal, conversationId: convo.id as string }
@@ -76,7 +89,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const toMark = messages.filter((m) => m.sender_id !== user.id && !m.read_at).map((m) => m.id)
     if (toMark.length) {
       const svc = createServiceSupabase()
-      await svc.from("messages").update({ read_at: new Date().toISOString() }).in("id", toMark)
+      const { error: markErr } = await svc.from("messages").update({ read_at: new Date().toISOString() }).in("id", toMark)
+      if (markErr) console.error("read-receipt update failed:", markErr.message)
     }
 
     return NextResponse.json({ conversationId, messages })
