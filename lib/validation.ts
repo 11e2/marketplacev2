@@ -134,7 +134,7 @@ export const depositSchema = z.object({
 })
 
 export const withdrawSchema = z.object({
-  amount: z.number().positive(),
+  amount: z.number().positive().max(1_000_000),
 })
 
 export const reviewSchema = z.object({

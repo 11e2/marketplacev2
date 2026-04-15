@@ -4,9 +4,14 @@ import { ApiError, handleApiError } from "@/lib/errors"
 import { platformEnum } from "@/lib/validation"
 
 // In production this redirects to the platform's OAuth consent URL built from
-// env credentials and a CSRF-protected state param. In dev we redirect back to
-// the local callback with a simulated code so the flow works end-to-end.
-// TODO(oauth): replace with real provider URLs for TIKTOK, INSTAGRAM, YOUTUBE, TWITTER, DISCORD, TWITCH.
+// env credentials. A cryptographically random `state` must be generated,
+// stored in a short-lived http-only cookie (or server-side session), and later
+// validated byte-for-byte in the callback to defend against CSRF / login-CSRF.
+// In dev we redirect back to the local callback with a simulated code so the
+// flow works end-to-end.
+// TODO(oauth): replace with real provider URLs + state-param CSRF validation
+// (generate random state here, verify in callback) for TIKTOK, INSTAGRAM,
+// YOUTUBE, TWITTER, DISCORD, TWITCH.
 export async function GET(request: Request, { params }: { params: Promise<{ platform: string }> }) {
   try {
     const { platform: raw } = await params

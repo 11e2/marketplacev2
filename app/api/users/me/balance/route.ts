@@ -10,7 +10,7 @@ export async function GET() {
     } = await supabase.auth.getUser()
     if (!user) throw new ApiError("UNAUTHORIZED", "Not signed in")
 
-    const [{ data: balance }, { data: txs }] = await Promise.all([
+    const [{ data: balance }, { data: txs }, { data: lifetimeRows }] = await Promise.all([
       supabase.from("balances").select("available, pending, currency").eq("user_id", user.id).maybeSingle(),
       supabase
         .from("transactions")
@@ -18,11 +18,15 @@ export async function GET() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(100),
+      supabase
+        .from("transactions")
+        .select("amount")
+        .eq("user_id", user.id)
+        .eq("type", "EARNING")
+        .eq("status", "COMPLETED"),
     ])
 
-    const lifetime = (txs ?? [])
-      .filter((t) => t.type === "EARNING" && t.status === "COMPLETED")
-      .reduce((s, t) => s + Number(t.amount ?? 0), 0)
+    const lifetime = (lifetimeRows ?? []).reduce((s, t) => s + Number(t.amount ?? 0), 0)
 
     return NextResponse.json({
       available: Number(balance?.available ?? 0),

@@ -6,8 +6,10 @@ import { platformEnum } from "@/lib/validation"
 type Platform = "TIKTOK" | "INSTAGRAM" | "YOUTUBE" | "TWITTER" | "DISCORD" | "TWITCH" | "PODCAST"
 
 // Dev simulation: seed realistic-looking metrics so the UI has something to show.
-// TODO(oauth): exchange `code` for tokens, call the platform API for identity +
-// metrics, encrypt tokens at rest, schedule the daily metric sync job.
+// TODO(oauth): validate the `state` query param against the value the connect
+// handler stored in a cookie (CSRF defense — reject if missing or mismatched),
+// exchange `code` for tokens, call the platform API for identity + metrics,
+// encrypt tokens at rest, schedule the daily metric sync job.
 function fakeStats(platform: Platform) {
   const base = Math.floor(Math.random() * 80_000) + 10_000
   return {
