@@ -51,15 +51,24 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState<SidebarUser | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    fetch("/api/users/me", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (!cancelled && j?.user) setUser(j.user)
+    fetch("/api/users/me", { cache: "no-store", credentials: "same-origin" })
+      .then(async (r) => {
+        if (!r.ok) return null
+        const j = await r.json()
+        return j?.user ?? null
       })
-      .catch(() => {})
+      .then((u) => {
+        if (cancelled) return
+        setUser(u)
+        setLoaded(true)
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded(true)
+      })
     return () => {
       cancelled = true
     }
@@ -123,46 +132,46 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
         </div>
       )}
 
-      {user && (
-        <div className="mx-3 mb-3 p-3 rounded-xl bg-secondary border border-border">
-          <div className="flex items-center gap-3">
-            {user.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.avatar_url}
-                alt=""
-                className="w-9 h-9 rounded-full object-cover border border-border"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-[#6C5CE7]/20 text-[#6C5CE7] flex items-center justify-center text-xs font-bold">
-                {initials || "U"}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{user.name}</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {role.charAt(0) + role.slice(1).toLowerCase()}
-              </p>
+      <div className="mx-3 mb-3 p-3 rounded-xl bg-secondary border border-border">
+        <div className="flex items-center gap-3">
+          {user?.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.avatar_url}
+              alt=""
+              className="w-9 h-9 rounded-full object-cover border border-border"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-[#6C5CE7]/20 text-[#6C5CE7] flex items-center justify-center text-xs font-bold">
+              {initials || "U"}
             </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1">
-            <Link
-              href="/settings"
-              className="flex-1 flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground py-1.5 rounded-md hover:bg-muted transition-colors"
-            >
-              <Settings size={13} />
-              Settings
-            </Link>
-            <button
-              onClick={signOut}
-              className="flex-1 flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground py-1.5 rounded-md hover:bg-muted transition-colors"
-            >
-              <LogOut size={13} />
-              Sign out
-            </button>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate">
+              {user?.name || (loaded ? "Guest" : "Loading...")}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user ? role.charAt(0) + role.slice(1).toLowerCase() : ""}
+            </p>
           </div>
         </div>
-      )}
+        <div className="mt-2 flex items-center gap-1">
+          <Link
+            href="/settings"
+            className="flex-1 flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground py-1.5 rounded-md hover:bg-muted transition-colors"
+          >
+            <Settings size={13} />
+            Settings
+          </Link>
+          <button
+            onClick={signOut}
+            className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-[#FF6B6B] hover:bg-[#FF6B6B]/10 py-1.5 rounded-md transition-colors"
+          >
+            <LogOut size={13} />
+            Sign out
+          </button>
+        </div>
+      </div>
     </aside>
   )
 }
