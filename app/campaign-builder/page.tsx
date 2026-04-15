@@ -2,11 +2,13 @@
 
 import { useState, useRef } from "react"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { Check, Smartphone, Video, MessageCircle, BookOpen, Headphones, Sparkles, Eye, Upload, X, Zap, DollarSign, Users } from "lucide-react"
 import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { ChannelChip } from "@/components/channel-chip"
 import { channelColors } from "@/lib/data"
+import { createBrowserSupabase } from "@/lib/supabase-browser"
 
 const steps = ["Campaign Type", "Details", "Requirements", "Asset", "Review"]
 
@@ -75,7 +77,9 @@ interface FormData {
 }
 
 export default function CampaignBuilderPage() {
+  const router = useRouter()
   const [activeStep, setActiveStep] = useState(0)
+  const [saving, setSaving] = useState<"draft" | "publish" | null>(null)
   const [formData, setFormData] = useState<FormData>({
     campaignType: null,
     title: "",
@@ -146,9 +150,90 @@ export default function CampaignBuilderPage() {
     }
   }
 
-  const handlePublish = () => {
-    toast.success("Campaign published! It will appear in the marketplace shortly.")
+  async function uploadBrandAsset(): Promise<string | null> {
+    if (!formData.brandAssetFile) return null
+    const supabase = createBrowserSupabase()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      toast.error("You must be signed in")
+      return null
+    }
+    const ext = formData.brandAssetFile.name.split(".").pop() || "png"
+    const path = `${user.id}/${Date.now()}.${ext}`
+    const { error } = await supabase.storage
+      .from("campaign-assets")
+      .upload(path, formData.brandAssetFile, { upsert: true })
+    if (error) {
+      toast.error(error.message)
+      return null
+    }
+    const { data } = supabase.storage.from("campaign-assets").getPublicUrl(path)
+    return data.publicUrl
   }
+
+  function validatePayload(): string | null {
+    if (!formData.campaignType) return "Pick a campaign type first"
+    if (formData.title.trim().length < 3) return "Title must be at least 3 characters"
+    if (formData.description.trim().length < 10) return "Description must be at least 10 characters"
+    if (formData.channels.length === 0) return "Pick at least one channel"
+    if (formData.totalBudget <= 0) return "Set a budget"
+    return null
+  }
+
+  async function save(publish: boolean) {
+    if (formData.campaignType === "standard") {
+      toast.info("Standard campaigns are coming soon")
+      return
+    }
+    const err = validatePayload()
+    if (err) return toast.error(err)
+
+    setSaving(publish ? "publish" : "draft")
+
+    let assetUrl = formData.brandAssetUrl
+    if (formData.brandAssetFile && (!assetUrl || assetUrl.startsWith("blob:"))) {
+      const uploaded = await uploadBrandAsset()
+      if (!uploaded) {
+        setSaving(null)
+        return
+      }
+      assetUrl = uploaded
+      setFormData((prev) => ({ ...prev, brandAssetUrl: uploaded }))
+    }
+
+    const body = {
+      title: formData.title,
+      description: formData.description,
+      type: "CLIPPING" as const,
+      channels: formData.channels,
+      totalBudget: formData.totalBudget,
+      cpm: formData.cpm,
+      minFollowers: formData.minFollowers,
+      minViews: formData.minViews,
+      brandAssetUrl: assetUrl && !assetUrl.startsWith("blob:") ? assetUrl : undefined,
+      publish,
+    }
+
+    const res = await fetch("/api/campaigns", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    setSaving(null)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast.error(j?.error?.message || "Failed to save campaign")
+      return
+    }
+    const { id } = await res.json()
+    toast.success(publish ? "Campaign published" : "Draft saved")
+    router.push(publish ? `/campaigns/${id}/manage` : "/campaigns")
+  }
+
+  const handlePublish = () => save(true)
+  const handleSaveDraft = () => save(false)
 
   const isClipping = formData.campaignType === "clipping"
   const estimatedReach = Math.floor(formData.totalBudget / formData.cpm * 1000)
@@ -678,13 +763,23 @@ export default function CampaignBuilderPage() {
                     </div>
                   )}
 
-                  <button
-                    onClick={handlePublish}
-                    className="w-full bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-sm font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Zap size={18} />
-                    Publish Campaign
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={handleSaveDraft}
+                      disabled={saving !== null}
+                      className="flex-1 border border-[#2A3050] text-[#E2E8F0] hover:bg-[#1A2035] text-sm font-bold py-3.5 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      {saving === "draft" ? "Saving..." : "Save as Draft"}
+                    </button>
+                    <button
+                      onClick={handlePublish}
+                      disabled={saving !== null}
+                      className="flex-1 bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-sm font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <Zap size={18} />
+                      {saving === "publish" ? "Publishing..." : "Publish Campaign"}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
