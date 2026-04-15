@@ -94,6 +94,17 @@ export function WithdrawModal({
           >
             Withdraw maximum
           </button>
+          {(() => {
+            const n = Number(amount)
+            if (!Number.isFinite(n) || n < MIN) return null
+            const fee = n * 0.04
+            const net = n - fee
+            return (
+              <p className="text-[11px] text-[#8892A8] mt-2">
+                You will receive <span className="font-mono font-semibold text-[#E2E8F0]">${net.toFixed(2)}</span> after the 4% platform fee (${fee.toFixed(2)}).
+              </p>
+            )
+          })()}
         </div>
 
         <DialogFooter>

@@ -32,7 +32,7 @@ interface LinkedAccount {
 }
 
 const ALL_PLATFORMS: { key: Platform; label: string; color: string }[] = [
-  { key: "TIKTOK", label: "TikTok", color: "#000000" },
+  { key: "TIKTOK", label: "TikTok", color: "#25F4EE" },
   { key: "INSTAGRAM", label: "Instagram", color: "#E91E8C" },
   { key: "YOUTUBE", label: "YouTube", color: "#FF0000" },
   { key: "TWITTER", label: "Twitter/X", color: "#1DA1F2" },

@@ -166,7 +166,7 @@ export default function DashboardPage() {
             </button>
             <Link
               href="/campaign-builder"
-              className="bg-[#FF6B35] hover:bg-[#e55a25] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2"
+              className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2"
             >
               <Layers size={14} />
               New Campaign
@@ -197,7 +197,10 @@ export default function DashboardPage() {
 
         <div className="grid lg:grid-cols-2 gap-4 mb-6">
           <div className="bg-[#131825] border border-[#2A3050] rounded-xl p-5">
-            <h2 className="text-sm font-bold text-[#E2E8F0] mb-4">Spend by Channel</h2>
+            <div className="mb-4">
+              <h2 className="text-sm font-bold text-[#E2E8F0]">Spend by Channel</h2>
+              <p className="text-[11px] text-[#8892A8]">Estimated share (equal split across each campaign's channels)</p>
+            </div>
             {channelEntries.length === 0 ? (
               <EmptyState
                 icon={TrendingDown}

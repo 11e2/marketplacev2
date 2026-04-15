@@ -1,5 +1,4 @@
-import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { BackLink } from "@/components/back-link"
 
 export const metadata = { title: "Privacy Policy - Marketingplace" }
 
@@ -96,13 +95,7 @@ export default function PrivacyPage() {
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0]">
       <main className="max-w-3xl mx-auto px-6 py-12">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-sm text-[#8892A8] hover:text-[#E2E8F0] transition-colors mb-8"
-        >
-          <ArrowLeft size={14} />
-          Back to home
-        </Link>
+        <BackLink />
 
         <h1 className="text-3xl font-bold text-[#E2E8F0] mb-2">Privacy Policy</h1>
         <p className="text-sm text-[#8892A8] mb-10">Last updated: April 16, 2026</p>

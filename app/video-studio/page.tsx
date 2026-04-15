@@ -316,9 +316,64 @@ function VideoStudioContent() {
 
   const [submitUrl, setSubmitUrl] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [activeDealId, setActiveDealId] = useState<string | null>(null)
+  const [dealCheckDone, setDealCheckDone] = useState(false)
+  const [hasLinkedAccount, setHasLinkedAccount] = useState<boolean | null>(null)
+
+  // Resolve active deal for this campaign upfront so we can gate the submit UI.
+  useEffect(() => {
+    if (!campaignId) {
+      setDealCheckDone(true)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const { createBrowserSupabase } = await import("@/lib/supabase-browser")
+      const supabase = createBrowserSupabase()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (cancelled) return
+      if (!user) {
+        setDealCheckDone(true)
+        return
+      }
+      const { data: deals } = await supabase
+        .from("deals")
+        .select("id")
+        .eq("campaign_id", campaignId)
+        .eq("creator_user_id", user.id)
+        .in("status", ["ACCEPTED", "IN_PROGRESS"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+      if (cancelled) return
+      setActiveDealId(deals?.[0]?.id ?? null)
+      setDealCheckDone(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [campaignId])
+
+  // Check linked accounts so we can hide the stub Publish button when none.
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/users/me/linked-accounts", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((j) => {
+        if (cancelled) return
+        setHasLinkedAccount((j.items ?? []).length > 0)
+      })
+      .catch(() => {
+        if (!cancelled) setHasLinkedAccount(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleSubmitToCampaign = useCallback(async () => {
-    if (!campaignId) return
+    if (!activeDealId) return
     const url = submitUrl.trim()
     if (!url) {
       toast.error("Paste the platform post URL")
@@ -332,27 +387,7 @@ function VideoStudioContent() {
     }
     setSubmitting(true)
     try {
-      const { createBrowserSupabase } = await import("@/lib/supabase-browser")
-      const supabase = createBrowserSupabase()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        toast.error("Please sign in first")
-        return
-      }
-      const { data: deals } = await supabase
-        .from("deals")
-        .select("id, status")
-        .eq("campaign_id", campaignId)
-        .eq("creator_user_id", user.id)
-        .in("status", ["ACCEPTED", "IN_PROGRESS"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-      const deal = deals?.[0]
-      if (!deal) {
-        toast.error("No active deal found for this campaign. Apply first and wait for approval.")
-        return
-      }
-      const r = await fetch(`/api/deals/${deal.id}/submissions`, {
+      const r = await fetch(`/api/deals/${activeDealId}/submissions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ platformPostUrl: url }),
@@ -366,7 +401,7 @@ function VideoStudioContent() {
     } finally {
       setSubmitting(false)
     }
-  }, [campaignId, submitUrl])
+  }, [activeDealId, submitUrl])
 
   const canProcess = videoFile && overlayImage && processingState !== "processing"
 
@@ -442,7 +477,7 @@ function VideoStudioContent() {
             )}
             <div>
               <h1 className="text-xl font-bold text-[#E2E8F0]">
-                {isFromCampaign ? `Apply to ${campaignBrand}` : "Video Studio"}
+                {isFromCampaign ? (campaignBrand ? `Apply to ${campaignBrand}` : "Campaign submission") : "Video Studio"}
               </h1>
               <p className="text-sm text-[#8892A8]">
                 Overlay brand assets onto your video
@@ -544,7 +579,7 @@ function VideoStudioContent() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[#E2E8F0] truncate">
-                      {isFromCampaign ? `${campaignBrand} Asset` : overlayFile?.name}
+                      {isFromCampaign ? (campaignBrand ? `${campaignBrand} Asset` : "Campaign Asset") : overlayFile?.name}
                     </p>
                     {isFromCampaign && <p className="text-xs text-[#8892A8]">Campaign asset</p>}
                   </div>
@@ -589,6 +624,9 @@ function VideoStudioContent() {
                     <button
                       key={pos}
                       onClick={() => setPosition(pos)}
+                      aria-label={pos.replace("-", " ")}
+                      aria-pressed={position === pos}
+                      title={pos.replace("-", " ")}
                       className={cn(
                         "py-2 text-xs font-medium rounded transition-colors",
                         position === pos ? "bg-[#6C5CE7] text-white" : "bg-[#1A2035] text-[#8892A8] hover:text-[#E2E8F0]"
@@ -724,33 +762,44 @@ function VideoStudioContent() {
                         Download
                       </Button>
                       {isFromCampaign ? (
-                        <div className="space-y-2 pt-2 border-t border-[#2A3050]">
-                          <p className="text-xs text-[#8892A8]">
-                            After posting on {campaignBrand || "your channel"}, paste the post URL below to submit.
-                          </p>
-                          <input
-                            type="url"
-                            value={submitUrl}
-                            onChange={(e) => setSubmitUrl(e.target.value)}
-                            placeholder="https://tiktok.com/@you/video/..."
-                            className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] placeholder:text-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
-                            disabled={submitting}
-                          />
-                          <Button
-                            onClick={handleSubmitToCampaign}
-                            disabled={submitting}
-                            className="w-full bg-[#00B894] hover:bg-[#00a383] text-white disabled:opacity-60"
-                          >
-                            <Send className="mr-2 h-4 w-4" />
-                            {submitting ? "Submitting..." : "Submit to Campaign"}
-                          </Button>
-                        </div>
-                      ) : (
+                        !dealCheckDone ? (
+                          <div className="pt-2 border-t border-[#2A3050] flex items-center gap-2 text-xs text-[#8892A8]">
+                            <Loader2 size={12} className="animate-spin" />
+                            Checking your deal status...
+                          </div>
+                        ) : !activeDealId ? (
+                          <div className="pt-2 border-t border-[#2A3050] text-xs text-[#FF9F43] bg-[#FF9F4310] border border-[#FF9F4340] rounded-lg p-3">
+                            Deal required. Apply to this campaign and wait for the brand to accept before submitting.
+                          </div>
+                        ) : (
+                          <div className="space-y-2 pt-2 border-t border-[#2A3050]">
+                            <p className="text-xs text-[#8892A8]">
+                              After posting on your channel, paste the post URL below to submit.
+                            </p>
+                            <input
+                              type="url"
+                              value={submitUrl}
+                              onChange={(e) => setSubmitUrl(e.target.value)}
+                              placeholder="https://tiktok.com/@you/video/..."
+                              className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] placeholder:text-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
+                              disabled={submitting}
+                            />
+                            <Button
+                              onClick={handleSubmitToCampaign}
+                              disabled={submitting}
+                              className="w-full bg-[#00B894] hover:bg-[#00a383] text-white disabled:opacity-60"
+                            >
+                              <Send className="mr-2 h-4 w-4" />
+                              {submitting ? "Submitting..." : "Submit to Campaign"}
+                            </Button>
+                          </div>
+                        )
+                      ) : hasLinkedAccount ? (
                         <Button onClick={handlePublish} className="w-full bg-[#00B894] hover:bg-[#00a383] text-white">
                           <Send className="mr-2 h-4 w-4" />
-                          Publish (@YourChannelName)
+                          Publish to connected account
                         </Button>
-                      )}
+                      ) : null}
                     </div>
                   )}
 
