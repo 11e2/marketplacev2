@@ -16,13 +16,15 @@ const listQuery = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(24),
 })
 
-const createSchema = z.object({
-  title: z.string().min(3).max(120),
-  description: z.string().min(10).max(4000),
+// Drafts are intentionally permissive so brands can save partial work.
+// Full validation kicks in when publish === true.
+const draftSchema = z.object({
+  title: z.string().min(1).max(120),
+  description: z.string().max(4000).optional().default(""),
   type: campaignType,
-  channels: z.array(z.string().min(1)).min(1),
-  totalBudget: z.number().positive().max(10_000_000),
-  cpm: z.number().positive().optional(),
+  channels: z.array(z.string().min(1)).default([]),
+  totalBudget: z.number().nonnegative().max(10_000_000).optional().default(0),
+  cpm: z.number().nonnegative().optional(),
   minFollowers: z.number().int().nonnegative().optional(),
   minViews: z.number().int().nonnegative().optional(),
   spots: z.number().int().positive().optional(),
@@ -32,6 +34,13 @@ const createSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional(),
   publish: z.boolean().optional(),
+})
+
+const publishSchema = draftSchema.extend({
+  title: z.string().min(3).max(120),
+  description: z.string().min(10).max(4000),
+  channels: z.array(z.string().min(1)).min(1),
+  totalBudget: z.number().positive().max(10_000_000),
 })
 
 function computedFields(row: Record<string, unknown>) {
@@ -98,13 +107,19 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
     if (!user) throw new ApiError("UNAUTHORIZED", "Not signed in")
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (profile?.role !== "BRAND" && profile?.role !== "ADMIN") {
-      throw new ApiError("FORBIDDEN", "Only brands can create campaigns")
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle()
+    if (!profile) throw new ApiError("BAD_REQUEST", "Profile missing. Finish onboarding first.")
+    if (profile.role !== "BRAND" && profile.role !== "ADMIN") {
+      throw new ApiError("FORBIDDEN", "Only brand accounts can create campaigns")
     }
 
-    const input = createSchema.parse(await request.json())
-    if (input.type === "CLIPPING" && !input.cpm) {
+    const body = await request.json()
+    const input = body?.publish ? publishSchema.parse(body) : draftSchema.parse(body)
+    if (input.publish && input.type === "CLIPPING" && !input.cpm) {
       throw new ApiError("BAD_REQUEST", "CPM is required for clipping campaigns")
     }
 

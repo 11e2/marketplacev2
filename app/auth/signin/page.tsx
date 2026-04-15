@@ -2,12 +2,20 @@
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { toast } from "sonner"
 import { createBrowserSupabase } from "@/lib/supabase-browser"
 import { AuthShell, authInput, authButton, authLabel } from "@/components/auth-shell"
 
 export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInInner />
+    </Suspense>
+  )
+}
+
+function SignInInner() {
   const router = useRouter()
   const params = useSearchParams()
   const redirectTo = params.get("redirectTo") || "/marketplace"

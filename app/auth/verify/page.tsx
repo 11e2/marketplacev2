@@ -2,13 +2,21 @@
 
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { toast } from "sonner"
 import { Mail } from "lucide-react"
 import { createBrowserSupabase } from "@/lib/supabase-browser"
 import { AuthShell, authButton } from "@/components/auth-shell"
 
 export default function VerifyPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyInner />
+    </Suspense>
+  )
+}
+
+function VerifyInner() {
   const email = useSearchParams().get("email") || ""
   const [loading, setLoading] = useState(false)
 

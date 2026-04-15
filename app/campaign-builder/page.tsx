@@ -173,12 +173,14 @@ export default function CampaignBuilderPage() {
     return data.publicUrl
   }
 
-  function validatePayload(): string | null {
+  function validatePayload(publish: boolean): string | null {
     if (!formData.campaignType) return "Pick a campaign type first"
+    if (formData.title.trim().length < 1) return "Give your campaign a title before saving"
+    if (!publish) return null
     if (formData.title.trim().length < 3) return "Title must be at least 3 characters"
     if (formData.description.trim().length < 10) return "Description must be at least 10 characters"
     if (formData.channels.length === 0) return "Pick at least one channel"
-    if (formData.totalBudget <= 0) return "Set a budget"
+    if (formData.totalBudget <= 0) return "Set a budget before publishing"
     return null
   }
 
@@ -187,7 +189,7 @@ export default function CampaignBuilderPage() {
       toast.info("Standard campaigns are coming soon")
       return
     }
-    const err = validatePayload()
+    const err = validatePayload(publish)
     if (err) return toast.error(err)
 
     setSaving(publish ? "publish" : "draft")
@@ -216,15 +218,25 @@ export default function CampaignBuilderPage() {
       publish,
     }
 
-    const res = await fetch("/api/campaigns", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    })
+    let res: Response
+    try {
+      res = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(body),
+      })
+    } catch (fetchErr) {
+      console.error("[campaign-builder] network error:", fetchErr)
+      setSaving(null)
+      toast.error("Network error. Check your connection and try again.")
+      return
+    }
     setSaving(null)
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
-      toast.error(j?.error?.message || "Failed to save campaign")
+      console.error("[campaign-builder] save failed", res.status, j)
+      toast.error(j?.error?.message || `Failed to save campaign (${res.status})`)
       return
     }
     const { id } = await res.json()
@@ -785,7 +797,7 @@ export default function CampaignBuilderPage() {
             )}
 
             {/* Navigation */}
-            <div className="flex items-center justify-between mt-6">
+            <div className="flex items-center justify-between gap-3 mt-6">
               <button
                 onClick={handleBack}
                 disabled={activeStep === 0}
@@ -793,15 +805,26 @@ export default function CampaignBuilderPage() {
               >
                 Back{activeStep > 0 ? `: ${steps[activeStep - 1]}` : ""}
               </button>
-              {activeStep < steps.length - 1 && (
-                <button
-                  onClick={handleNext}
-                  disabled={activeStep === 0 && !formData.campaignType}
-                  className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Continue: {steps[activeStep + 1]}
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {formData.campaignType === "clipping" && formData.title.trim().length > 0 && (
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={saving !== null}
+                    className="border border-[#2A3050] text-[#E2E8F0] hover:bg-[#1A2035] text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    {saving === "draft" ? "Saving..." : "Save Draft"}
+                  </button>
+                )}
+                {activeStep < steps.length - 1 && (
+                  <button
+                    onClick={handleNext}
+                    disabled={activeStep === 0 && !formData.campaignType}
+                    className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Continue: {steps[activeStep + 1]}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

@@ -47,39 +47,55 @@ interface SidebarUser {
   role: "CREATOR" | "BRAND" | "ADMIN"
 }
 
+// Module-level cache keeps the user stable across navigations so the sidebar
+// doesn't flicker between creator and brand nav while re-fetching.
+let cachedUser: SidebarUser | null | undefined = undefined
+let inflight: Promise<SidebarUser | null> | null = null
+
+function loadUser(): Promise<SidebarUser | null> {
+  if (cachedUser !== undefined) return Promise.resolve(cachedUser)
+  if (inflight) return inflight
+  inflight = fetch("/api/users/me", { cache: "no-store", credentials: "same-origin" })
+    .then(async (r) => (r.ok ? ((await r.json())?.user ?? null) : null))
+    .catch(() => null)
+    .then((u) => {
+      cachedUser = u
+      inflight = null
+      return u
+    })
+  return inflight
+}
+
 export function SidebarNav(_: { mode?: "creator" | "brand" }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [user, setUser] = useState<SidebarUser | null>(null)
-  const [loaded, setLoaded] = useState(false)
+  const [user, setUser] = useState<SidebarUser | null>(cachedUser ?? null)
+  const [loaded, setLoaded] = useState<boolean>(cachedUser !== undefined)
 
   useEffect(() => {
+    if (cachedUser !== undefined) {
+      setUser(cachedUser)
+      setLoaded(true)
+      return
+    }
     let cancelled = false
-    fetch("/api/users/me", { cache: "no-store", credentials: "same-origin" })
-      .then(async (r) => {
-        if (!r.ok) return null
-        const j = await r.json()
-        return j?.user ?? null
-      })
-      .then((u) => {
-        if (cancelled) return
-        setUser(u)
-        setLoaded(true)
-      })
-      .catch(() => {
-        if (!cancelled) setLoaded(true)
-      })
+    loadUser().then((u) => {
+      if (cancelled) return
+      setUser(u)
+      setLoaded(true)
+    })
     return () => {
       cancelled = true
     }
   }, [])
 
-  const role: "CREATOR" | "BRAND" = user?.role === "BRAND" ? "BRAND" : "CREATOR"
-  const nav = role === "BRAND" ? brandNav : creatorNav
+  const role: "CREATOR" | "BRAND" | null = user?.role === "BRAND" ? "BRAND" : user ? "CREATOR" : null
+  const nav = role === "BRAND" ? brandNav : role === "CREATOR" ? creatorNav : []
 
   async function signOut() {
     const supabase = createBrowserSupabase()
     await supabase.auth.signOut()
+    cachedUser = undefined
     toast.success("Signed out")
     router.push("/auth/signin")
     router.refresh()
