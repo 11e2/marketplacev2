@@ -48,7 +48,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       })
       .select("id, status, applied_at")
       .single()
-    if (error) throw new ApiError("INTERNAL", error.message)
+    if (error) {
+      if (error.code === "23505") throw new ApiError("CONFLICT", "You have already applied to this campaign")
+      throw new ApiError("INTERNAL", error.message)
+    }
 
     return NextResponse.json({ application: data }, { status: 201 })
   } catch (err) {

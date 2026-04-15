@@ -72,7 +72,7 @@ function VideoStudioContent() {
   const [isPreloaded, setIsPreloaded] = useState(false)
   const overlayInputRef = useRef<HTMLInputElement>(null)
 
-  // Settings — defaults: bottom-center, 50%
+  // Settings - defaults: bottom-center, 50%
   const [positionMode, setPositionMode] = useState<PositionMode>("grid")
   const [position, setPosition] = useState<Position>("bottom-center")
   const [customX, setCustomX] = useState(50)
@@ -314,9 +314,63 @@ function VideoStudioContent() {
     toast.success("Video ready to publish! Connect your account to post directly.")
   }, [])
 
+  const [submitUrl, setSubmitUrl] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmitToCampaign = useCallback(async () => {
+    if (!campaignId) return
+    const url = submitUrl.trim()
+    if (!url) {
+      toast.error("Paste the platform post URL")
+      return
+    }
+    try {
+      new URL(url)
+    } catch {
+      toast.error("Enter a valid URL")
+      return
+    }
+    setSubmitting(true)
+    try {
+      const { createBrowserSupabase } = await import("@/lib/supabase-browser")
+      const supabase = createBrowserSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error("Please sign in first")
+        return
+      }
+      const { data: deals } = await supabase
+        .from("deals")
+        .select("id, status")
+        .eq("campaign_id", campaignId)
+        .eq("creator_user_id", user.id)
+        .in("status", ["ACCEPTED", "IN_PROGRESS"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+      const deal = deals?.[0]
+      if (!deal) {
+        toast.error("No active deal found for this campaign. Apply first and wait for approval.")
+        return
+      }
+      const r = await fetch(`/api/deals/${deal.id}/submissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platformPostUrl: url }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j?.error?.message || "Submission failed")
+      toast.success("Submitted to brand for review")
+      setSubmitUrl("")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed")
+    } finally {
+      setSubmitting(false)
+    }
+  }, [campaignId, submitUrl])
+
   const canProcess = videoFile && overlayImage && processingState !== "processing"
 
-  // Overlay preview styles — positions the overlay relative to the actual
+  // Overlay preview styles - positions the overlay relative to the actual
   // rendered video rect inside the object-contain preview container.
   // containerRef is set on the video wrapper div so we can measure it.
   const previewContainerRef = useRef<HTMLDivElement>(null)
@@ -584,7 +638,7 @@ function VideoStudioContent() {
             </div>
           </div>
 
-          {/* Right: Preview — portrait (9:16) to match short-form video */}
+          {/* Right: Preview - portrait (9:16) to match short-form video */}
           <div className="lg:w-[45%] flex justify-center">
             <div className="w-full max-w-[340px]">
               <div className="bg-[#131825] rounded-xl border border-[#2A3050]">
@@ -669,10 +723,34 @@ function VideoStudioContent() {
                         <Download className="mr-2 h-4 w-4" />
                         Download
                       </Button>
-                      <Button onClick={handlePublish} className="w-full bg-[#00B894] hover:bg-[#00a383] text-white">
-                        <Send className="mr-2 h-4 w-4" />
-                        Publish (@YourChannelName)
-                      </Button>
+                      {isFromCampaign ? (
+                        <div className="space-y-2 pt-2 border-t border-[#2A3050]">
+                          <p className="text-xs text-[#8892A8]">
+                            After posting on {campaignBrand || "your channel"}, paste the post URL below to submit.
+                          </p>
+                          <input
+                            type="url"
+                            value={submitUrl}
+                            onChange={(e) => setSubmitUrl(e.target.value)}
+                            placeholder="https://tiktok.com/@you/video/..."
+                            className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] placeholder:text-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
+                            disabled={submitting}
+                          />
+                          <Button
+                            onClick={handleSubmitToCampaign}
+                            disabled={submitting}
+                            className="w-full bg-[#00B894] hover:bg-[#00a383] text-white disabled:opacity-60"
+                          >
+                            <Send className="mr-2 h-4 w-4" />
+                            {submitting ? "Submitting..." : "Submit to Campaign"}
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button onClick={handlePublish} className="w-full bg-[#00B894] hover:bg-[#00a383] text-white">
+                          <Send className="mr-2 h-4 w-4" />
+                          Publish (@YourChannelName)
+                        </Button>
+                      )}
                     </div>
                   )}
 
