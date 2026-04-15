@@ -87,6 +87,24 @@ export const proposalSchema = z.object({
   message: z.string().max(2000).optional(),
 })
 
+export const createDealSchema = z.object({
+  applicationId: uuid.optional(),
+  creatorUserId: uuid.optional(),
+  campaignId: uuid.optional(),
+  agreedRate: z.number().positive(),
+  rateType: rateType.default("FLAT"),
+  deliverables: z.array(z.object({ name: z.string(), detail: z.string().optional() })).default([]),
+  deadline: z.string().datetime().optional(),
+})
+
+export const dealTransition = z.object({
+  status: z.enum(["ACCEPTED", "IN_PROGRESS", "DELIVERED", "APPROVED", "DISPUTED", "COMPLETED", "CANCELLED"]),
+})
+
+export const proposalResponseSchema = z.object({
+  status: z.enum(["ACCEPTED", "COUNTERED", "DECLINED"]),
+})
+
 export const messageSchema = z.object({
   content: z.string().min(1).max(5000),
   proposalId: uuid.optional(),
