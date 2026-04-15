@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Play, Pause, Trash2, Rocket } from "lucide-react"
+import { VerifiedBadge } from "@/components/verified-badge"
 
 interface Campaign {
   id: string
@@ -31,7 +32,13 @@ interface Application {
   message: string | null
   applied_at: string
   creator: { id: string; name: string | null; avatar_url: string | null } | null
-  creator_detail: { bio: string | null; niches: string[] | null; total_reach: number | null; avg_rating: number | null } | null
+  creator_detail: {
+    bio: string | null
+    niches: string[] | null
+    total_reach: number | null
+    avg_rating: number | null
+    is_verified?: boolean | null
+  } | null
 }
 
 const inputCls =
@@ -257,6 +264,7 @@ export function ManagePanel({ campaign: initial }: { campaign: Campaign }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-white">{a.creator?.name || "Unknown"}</p>
+                    <VerifiedBadge verified={a.creator_detail?.is_verified} size={14} />
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#8892A820] text-[#8892A8]">
                       {a.status}
                     </span>

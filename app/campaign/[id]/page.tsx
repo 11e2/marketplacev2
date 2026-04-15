@@ -3,10 +3,11 @@
 import { use, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, AlertCircle, CheckCircle2, Zap, BadgeCheck, Loader2 } from "lucide-react"
+import { ArrowLeft, AlertCircle, CheckCircle2, Zap, Loader2 } from "lucide-react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState } from "@/components/empty-state"
 import { ApplyModal } from "@/components/apply-modal"
+import { VerifiedBadge } from "@/components/verified-badge"
 import { createBrowserSupabase } from "@/lib/supabase-browser"
 
 interface CampaignDetail {
@@ -190,9 +191,8 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                         <p className="text-sm font-semibold text-[#E2E8F0] truncate">
                           {campaign.brand?.company_name || campaign.owner?.name || "Brand"}
                         </p>
-                        {campaign.brand?.is_verified && (
-                          <BadgeCheck size={14} className="text-[#6C5CE7] shrink-0" />
-                        )}
+                        <VerifiedBadge verified={campaign.brand?.is_verified} size={14} />
+
                       </div>
                       {campaign.brand?.industry && (
                         <p className="text-xs text-[#8892A8] truncate">{campaign.brand.industry}</p>
