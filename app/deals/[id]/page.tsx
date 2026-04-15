@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState } from "@/components/empty-state"
+import { VerifiedBadge } from "@/components/verified-badge"
 import { ProposalModal } from "@/components/proposal-modal"
 import { SubmissionModal } from "@/components/submission-modal"
 import { createBrowserSupabase } from "@/lib/supabase-browser"
@@ -49,6 +50,8 @@ interface Deal {
   campaign: { id: string; title: string; type: string; channels: string[] } | null
   brand: { id: string; name: string | null; avatar_url: string | null } | null
   creator: { id: string; name: string | null; avatar_url: string | null } | null
+  brand_is_verified?: boolean | null
+  creator_is_verified?: boolean | null
 }
 
 interface Message {
@@ -362,8 +365,12 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#E2E8F0] truncate">
+                <p className="text-sm font-semibold text-[#E2E8F0] truncate inline-flex items-center gap-1">
                   {counterparty?.name || "Unknown"}
+                  <VerifiedBadge
+                    verified={role === "brand" ? deal.creator_is_verified : deal.brand_is_verified}
+                    size={13}
+                  />
                 </p>
                 <p className="text-xs text-[#8892A8] truncate">
                   {deal.campaign?.title || "Direct offer"}

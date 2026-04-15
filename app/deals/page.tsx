@@ -5,6 +5,7 @@ import Link from "next/link"
 import { AlertCircle, Handshake, DollarSign } from "lucide-react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState, SkeletonCard } from "@/components/empty-state"
+import { VerifiedBadge } from "@/components/verified-badge"
 
 type DealStatus =
   | "NEGOTIATING"
@@ -32,6 +33,8 @@ interface Deal {
   campaign: { id: string; title: string; type: string; channels: string[] } | null
   brand: { id: string; name: string | null; avatar_url: string | null } | null
   creator: { id: string; name: string | null; avatar_url: string | null } | null
+  brand_is_verified?: boolean | null
+  creator_is_verified?: boolean | null
 }
 
 const STATUS_COLORS: Record<DealStatus, { bg: string; color: string }> = {
@@ -134,6 +137,9 @@ export default function DealsPage() {
             {filtered.map((d) => {
               const meta = STATUS_COLORS[d.status]
               const counterparty = d.brand?.name || d.creator?.name || "Unknown"
+              const counterpartyVerified = d.brand?.name
+                ? d.brand_is_verified
+                : d.creator_is_verified
               return (
                 <Link
                   key={d.id}
@@ -156,7 +162,10 @@ export default function DealsPage() {
                       <h3 className="font-bold text-[#E2E8F0] mb-0.5 truncate">
                         {d.campaign?.title || "Direct offer"}
                       </h3>
-                      <p className="text-xs text-[#8892A8] mb-2 truncate">with {counterparty}</p>
+                      <p className="text-xs text-[#8892A8] mb-2 truncate inline-flex items-center gap-1">
+                        with {counterparty}
+                        <VerifiedBadge verified={counterpartyVerified} size={11} />
+                      </p>
                       <div className="flex items-center gap-4 text-xs text-[#8892A8]">
                         <span className="inline-flex items-center gap-1">
                           <DollarSign size={12} />

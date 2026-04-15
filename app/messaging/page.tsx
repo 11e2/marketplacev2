@@ -5,6 +5,7 @@ import Link from "next/link"
 import { AlertCircle, MessageSquare } from "lucide-react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState, SkeletonCard } from "@/components/empty-state"
+import { VerifiedBadge } from "@/components/verified-badge"
 import { createBrowserSupabase } from "@/lib/supabase-browser"
 
 interface Conversation {
@@ -19,6 +20,8 @@ interface Conversation {
   brand: { id: string; name: string | null; avatar_url: string | null } | null
   creator: { id: string; name: string | null; avatar_url: string | null } | null
   campaign: { id: string; title: string; channels: string[] } | null
+  brand_is_verified?: boolean | null
+  creator_is_verified?: boolean | null
 }
 
 function relativeTime(iso: string | null) {
@@ -137,8 +140,10 @@ export default function MessagingPage() {
         ) : (
           <div className="space-y-2">
             {filtered.map((c) => {
-              const counterparty = meId === c.brand_user_id ? c.creator : c.brand
+              const viewerIsBrand = meId === c.brand_user_id
+              const counterparty = viewerIsBrand ? c.creator : c.brand
               const name = counterparty?.name || "Unknown"
+              const counterpartyVerified = viewerIsBrand ? c.creator_is_verified : c.brand_is_verified
               return (
                 <Link
                   key={c.id}
@@ -159,7 +164,10 @@ export default function MessagingPage() {
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <p className="text-sm font-semibold text-[#E2E8F0] truncate">{name}</p>
+                      <p className="text-sm font-semibold text-[#E2E8F0] truncate inline-flex items-center gap-1">
+                        {name}
+                        <VerifiedBadge verified={counterpartyVerified} size={11} />
+                      </p>
                       <span className="text-[10px] text-[#8892A8] shrink-0">
                         {relativeTime(c.last_message_at || c.created_at)}
                       </span>
