@@ -2,22 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { ApiError, handleApiError } from "@/lib/errors"
-import { campaignType, campaignStatus } from "@/lib/validation"
-
-const listQuery = z.object({
-  channel: z.string().optional(),
-  channels: z.string().optional(),
-  type: campaignType.optional(),
-  status: campaignStatus.optional(),
-  search: z.string().trim().max(200).optional(),
-  minBudget: z.coerce.number().nonnegative().optional(),
-  maxBudget: z.coerce.number().nonnegative().optional(),
-  mine: z.enum(["1", "true"]).optional(),
-  cursor: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(24),
-  page: z.coerce.number().int().min(1).optional(),
-  pageSize: z.coerce.number().int().min(1).max(60).optional(),
-})
+import { campaignType, campaignStatus, campaignsListQuerySchema } from "@/lib/validation"
 
 // Drafts are intentionally permissive so brands can save partial work.
 // Full validation kicks in when publish === true.
@@ -59,7 +44,7 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url)
     const params = Object.fromEntries(url.searchParams.entries())
-    const q = listQuery.parse(params)
+    const q = campaignsListQuerySchema.parse(params)
 
     const supabase = await createServerSupabase()
     const {

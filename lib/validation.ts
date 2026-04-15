@@ -57,23 +57,18 @@ export const applyToCampaignSchema = z.object({
 })
 
 export const campaignsListQuerySchema = z.object({
-  search: z.string().trim().max(200).optional(),
-  channels: z
-    .string()
-    .optional()
-    .transform((v) =>
-      v
-        ? v
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : undefined,
-    ),
+  channel: z.string().optional(),
+  channels: z.string().optional(),
   type: campaignType.optional(),
+  status: campaignStatus.optional(),
+  search: z.string().trim().max(200).optional(),
   minBudget: z.coerce.number().nonnegative().optional(),
   maxBudget: z.coerce.number().nonnegative().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(60).default(24),
+  mine: z.enum(["1", "true"]).optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(24),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(60).optional(),
 })
 
 export const applicationsListQuerySchema = z.object({
