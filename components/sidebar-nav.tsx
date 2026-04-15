@@ -25,7 +25,7 @@ const creatorNav = [
   { label: "Marketplace", href: "/marketplace", icon: Store },
   { label: "My Applications", href: "/applications", icon: FileText },
   { label: "Linked Accounts", href: "/linked-accounts", icon: Link2 },
-  { label: "Active Deals", href: "/messaging", icon: Handshake },
+  { label: "Active Deals", href: "/deals", icon: Handshake },
   { label: "Video Studio", href: "/video-studio", icon: Video },
   { label: "Messages", href: "/messaging", icon: MessageSquare },
   { label: "Analytics", href: "/analytics", icon: BarChart2 },
@@ -37,8 +37,9 @@ const brandNav = [
   { label: "Campaigns", href: "/campaigns", icon: Layers },
   { label: "New Campaign", href: "/campaign-builder", icon: TrendingUp },
   { label: "Creators", href: "/marketplace", icon: Store },
+  { label: "Deals", href: "/deals", icon: Handshake },
   { label: "Messages", href: "/messaging", icon: MessageSquare },
-  { label: "Payouts", href: "/coming-soon", icon: Wallet },
+  { label: "Payouts", href: "/earnings", icon: Wallet },
 ]
 
 interface SidebarUser {
@@ -145,7 +146,7 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
       {role === "CREATOR" && (
         <div className="mx-3 mb-3 p-4 rounded-xl bg-secondary border border-border">
           <p className="text-xs font-semibold text-muted-foreground tracking-widest uppercase mb-1">This Month</p>
-          <p className="text-2xl font-bold text-muted-foreground font-mono">$—</p>
+          <p className="text-2xl font-bold text-muted-foreground font-mono">$-</p>
           <p className="text-xs text-muted-foreground mt-0.5">Earnings available in Phase 6</p>
         </div>
       )}

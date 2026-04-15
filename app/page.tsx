@@ -262,8 +262,8 @@ export default function LandingPage() {
               <div>
                 <p className="font-semibold text-[#E2E8F0] mb-3">Legal</p>
                 <ul className="space-y-2 text-[#8892A8]">
-                  <li><Link href="/coming-soon" className="hover:text-white">Privacy</Link></li>
-                  <li><Link href="/coming-soon" className="hover:text-white">Terms</Link></li>
+                  <li><Link href="/privacy" className="hover:text-white">Privacy</Link></li>
+                  <li><Link href="/terms" className="hover:text-white">Terms</Link></li>
                   <li><Link href="/coming-soon" className="hover:text-white">Cookie Policy</Link></li>
                 </ul>
               </div>
