@@ -52,6 +52,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(signIn)
   }
 
+  if (user && isProtected(pathname) && pathname !== "/onboarding" && !pathname.startsWith("/onboarding/")) {
+    const onboarded = Boolean(user.user_metadata?.onboarded)
+    if (!onboarded) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/onboarding"
+      url.search = ""
+      return NextResponse.redirect(url)
+    }
+  }
+
   return response
 }
 
