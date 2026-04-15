@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createServerSupabase } from "@/lib/supabase-server"
+import { createServerSupabase, createServiceSupabase } from "@/lib/supabase-server"
 import { ApiError, handleApiError } from "@/lib/errors"
 import { applicationsListQuerySchema } from "@/lib/validation"
 
@@ -41,7 +41,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     let followersByCreator = new Map<string, { totalFollowers: number; platforms: number }>()
     if (creatorIds.length) {
-      const { data: linked } = await supabase
+      const serviceSupabase = createServiceSupabase()
+      const { data: linked } = await serviceSupabase
         .from("linked_accounts")
         .select("user_id, followers")
         .in("user_id", creatorIds)
