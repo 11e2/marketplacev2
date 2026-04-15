@@ -12,6 +12,7 @@ const PROTECTED_PREFIXES = [
   "/services",
   "/linked-accounts",
   "/campaign-builder",
+  "/campaigns",
   "/settings",
   "/onboarding",
 ]

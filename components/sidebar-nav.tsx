@@ -32,7 +32,7 @@ const creatorNav = [
 
 const brandNav = [
   { label: "Dashboard", href: "/dashboard", icon: BarChart2 },
-  { label: "Campaigns", href: "/coming-soon", icon: Layers },
+  { label: "Campaigns", href: "/campaigns", icon: Layers },
   { label: "New Campaign", href: "/campaign-builder", icon: TrendingUp },
   { label: "Creators", href: "/marketplace", icon: Store },
   { label: "Messages", href: "/messaging", icon: MessageSquare },
