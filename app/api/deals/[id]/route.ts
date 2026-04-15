@@ -47,16 +47,25 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (error) throw new ApiError("INTERNAL", error.message)
     if (!data) throw new ApiError("NOT_FOUND", "Deal not found")
 
-    const [{ data: bp }, { data: cp }] = await Promise.all([
+    const svc = createServiceSupabase()
+    const [{ data: bp }, { data: cp }, { data: links }] = await Promise.all([
       supabase.from("brand_profiles").select("is_verified").eq("user_id", data.brand_user_id).maybeSingle(),
       supabase.from("creator_profiles").select("is_verified").eq("user_id", data.creator_user_id).maybeSingle(),
+      svc
+        .from("linked_accounts")
+        .select("is_verified")
+        .eq("user_id", data.creator_user_id)
+        .eq("is_verified", true)
+        .limit(1),
     ])
+    const creatorHasVerifiedLink = (links ?? []).length > 0
 
     return NextResponse.json({
       deal: {
         ...data,
         brand_is_verified: !!bp?.is_verified,
-        creator_is_verified: !!cp?.is_verified,
+        creator_is_verified: !!cp?.is_verified || creatorHasVerifiedLink,
+        creator_has_verified_link: creatorHasVerifiedLink,
       },
     })
   } catch (err) {

@@ -42,22 +42,34 @@ export async function GET(request: Request) {
     const rows = data ?? []
     const brandIds = Array.from(new Set(rows.map((r) => (r as { brand_user_id?: string }).brand_user_id).filter(Boolean))) as string[]
     const creatorIds = Array.from(new Set(rows.map((r) => (r as { creator_user_id?: string }).creator_user_id).filter(Boolean))) as string[]
-    const [bp, cp] = await Promise.all([
+    const svc = createServiceSupabase()
+    const [bp, cp, links] = await Promise.all([
       brandIds.length
         ? supabase.from("brand_profiles").select("user_id, is_verified").in("user_id", brandIds)
         : Promise.resolve({ data: [] as { user_id: string; is_verified: boolean }[] }),
       creatorIds.length
         ? supabase.from("creator_profiles").select("user_id, is_verified").in("user_id", creatorIds)
         : Promise.resolve({ data: [] as { user_id: string; is_verified: boolean }[] }),
+      creatorIds.length
+        ? svc.from("linked_accounts").select("user_id, is_verified").in("user_id", creatorIds).eq("is_verified", true)
+        : Promise.resolve({ data: [] as { user_id: string; is_verified: boolean }[] }),
     ])
     const brandVerified = new Map((bp.data ?? []).map((r) => [r.user_id, !!r.is_verified]))
     const creatorVerified = new Map((cp.data ?? []).map((r) => [r.user_id, !!r.is_verified]))
+    const creatorHasLink = new Set((links.data ?? []).map((r) => r.user_id))
 
-    const items = rows.map((r) => ({
-      ...r,
-      brand_is_verified: brandVerified.get((r as { brand_user_id: string }).brand_user_id) ?? false,
-      creator_is_verified: creatorVerified.get((r as { creator_user_id: string }).creator_user_id) ?? false,
-    }))
+    const items = rows.map((r) => {
+      const brandId = (r as { brand_user_id: string }).brand_user_id
+      const creatorId = (r as { creator_user_id: string }).creator_user_id
+      const creatorProfileVerified = creatorVerified.get(creatorId) ?? false
+      const creatorLinkVerified = creatorHasLink.has(creatorId)
+      return {
+        ...r,
+        brand_is_verified: brandVerified.get(brandId) ?? false,
+        creator_is_verified: creatorProfileVerified || creatorLinkVerified,
+        creator_has_verified_link: creatorLinkVerified,
+      }
+    })
 
     return NextResponse.json({ items })
   } catch (err) {
