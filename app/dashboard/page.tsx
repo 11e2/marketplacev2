@@ -80,7 +80,7 @@ export default function DashboardPage() {
   if (loading && !error) {
     return (
       <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
-        <SidebarNav mode="brand" />
+        <SidebarNav />
         <main className="flex-1 px-6 py-6 flex items-center justify-center">
           <Loader2 size={20} className="animate-spin text-[#6C5CE7]" />
         </main>
@@ -91,7 +91,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
-        <SidebarNav mode="brand" />
+        <SidebarNav />
         <main className="flex-1 px-6 py-6">
           <EmptyState icon={AlertCircle} title="Couldn't load dashboard" description={error} />
         </main>
@@ -149,7 +149,7 @@ export default function DashboardPage() {
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
-      <SidebarNav mode="brand" />
+      <SidebarNav />
 
       <main className="flex-1 min-w-0 px-6 py-6">
         <div className="flex items-center justify-between mb-6">

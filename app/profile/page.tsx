@@ -113,7 +113,7 @@ const reviews = [
 export default function ProfilePage() {
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
-      <SidebarNav mode="creator" />
+      <SidebarNav />
 
       <main className="flex-1 min-w-0 px-6 py-6 max-w-5xl">
         {/* Profile header */}

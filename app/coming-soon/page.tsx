@@ -10,7 +10,7 @@ export default function ComingSoonPage() {
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
-      <SidebarNav mode="creator" />
+      <SidebarNav />
       <main className="flex-1 min-w-0 px-6 py-6 flex items-center justify-center">
         <div className="text-center max-w-md">
           <div className="w-16 h-16 rounded-2xl bg-[#6C5CE720] flex items-center justify-center mx-auto mb-6">

@@ -422,7 +422,7 @@ function VideoStudioContent() {
 
   return (
     <div className="flex min-h-screen bg-[#0B0F1A] dark">
-      <SidebarNav mode="creator" />
+      <SidebarNav />
 
       {/* Hidden processing elements */}
       <video ref={hiddenVideoRef} className="hidden" playsInline crossOrigin="anonymous" />

@@ -5,7 +5,6 @@ import Link from "next/link"
 import { AlertCircle, Clock, CheckCircle2, XCircle, Inbox } from "lucide-react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState, SkeletonCard } from "@/components/empty-state"
-import { createBrowserSupabase } from "@/lib/supabase-browser"
 
 type Status = "PENDING" | "ACCEPTED" | "REJECTED" | "COMPLETED"
 
@@ -48,49 +47,24 @@ export default function MyApplicationsPage() {
     setError(null)
 
     async function load() {
-      // Prefer API endpoint when available; fall back to direct Supabase query.
       try {
         const r = await fetch("/api/users/me/applications", { cache: "no-store" })
-        if (r.ok) {
-          const json = await r.json()
-          if (cancelled) return
-          setApps(json.items ?? [])
+        const json = await r.json().catch(() => ({}))
+        if (cancelled) return
+        if (!r.ok) {
+          setError(json?.error?.message || "Failed to load applications")
+          setApps([])
           setLoading(false)
           return
         }
-        if (r.status !== 404) {
-          const json = await r.json().catch(() => ({}))
-          throw new Error(json?.error?.message || "Failed to load applications")
-        }
-      } catch {
-        // fall through to Supabase fallback
-      }
-
-      const supabase = createBrowserSupabase()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (cancelled) return
-      if (!user) {
+        setApps(json.items ?? [])
+        setLoading(false)
+      } catch (err) {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : "Failed to load applications")
         setApps([])
         setLoading(false)
-        return
       }
-      const { data, error: qerr } = await supabase
-        .from("campaign_applications")
-        .select(
-          "id, status, applied_at, message, campaign:campaigns(id, title, type, channels, accent_color, status, brand_user_id)",
-        )
-        .eq("creator_user_id", user.id)
-        .order("applied_at", { ascending: false })
-      if (cancelled) return
-      if (qerr) {
-        setError(qerr.message)
-        setApps([])
-      } else {
-        setApps((data ?? []) as unknown as ApplicationRow[])
-      }
-      setLoading(false)
     }
 
     load()
@@ -113,7 +87,7 @@ export default function MyApplicationsPage() {
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
-      <SidebarNav mode="creator" />
+      <SidebarNav />
 
       <main className="flex-1 min-w-0 px-6 py-6 max-w-5xl">
         <div className="mb-6">

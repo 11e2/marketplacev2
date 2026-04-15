@@ -117,7 +117,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
-      <SidebarNav mode="creator" />
+      <SidebarNav />
 
       <main className="flex-1 min-w-0 px-6 py-6 max-w-4xl">
         <Link
@@ -148,7 +148,21 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
               </Link>
             }
           />
-        ) : !campaign ? null : (
+        ) : !campaign ? (
+          <EmptyState
+            icon={AlertCircle}
+            title="Campaign not found"
+            description="This campaign may have been removed or is no longer available."
+            action={
+              <Link
+                href="/marketplace"
+                className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+              >
+                Back to Marketplace
+              </Link>
+            }
+          />
+        ) : (
           <div className="space-y-5">
             <div
               className="bg-[#131825] border border-[#2A3050] rounded-2xl overflow-hidden"

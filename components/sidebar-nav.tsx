@@ -69,7 +69,7 @@ function loadUser(): Promise<SidebarUser | null> {
   return inflight
 }
 
-export function SidebarNav(_: { mode?: "creator" | "brand" }) {
+export function SidebarNav() {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState<SidebarUser | null>(cachedUser ?? null)
@@ -113,11 +113,11 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
     .toUpperCase()
 
   return (
-    <aside className="hidden md:flex flex-col w-60 shrink-0 h-screen sticky top-0 border-r border-border bg-card">
-      <div className="px-5 py-5 border-b border-border">
+    <aside className="hidden md:flex flex-col w-60 shrink-0 h-screen sticky top-0 border-r border-[#2A3050] bg-[#131825]">
+      <div className="px-5 py-5 border-b border-[#2A3050]">
         <Link href="/" className="flex items-center gap-2">
           <span className="bg-[#6C5CE7] text-white text-xs font-bold px-2 py-1 rounded">MP</span>
-          <span className="font-bold text-sm tracking-wide text-foreground">MARKETINGPLACE</span>
+          <span className="font-bold text-sm tracking-wide text-[#E2E8F0]">MARKETINGPLACE</span>
         </Link>
       </div>
 
@@ -133,7 +133,7 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
                   ? "bg-[rgba(108,92,231,0.15)] text-[#6C5CE7]"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                  : "text-[#94A3B8] hover:text-[#E2E8F0] hover:bg-[#0B0F1A]",
               )}
             >
               <Icon size={18} strokeWidth={1.5} />
@@ -144,21 +144,21 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
       </nav>
 
       {role === "CREATOR" && (
-        <div className="mx-3 mb-3 p-4 rounded-xl bg-secondary border border-border">
-          <p className="text-xs font-semibold text-muted-foreground tracking-widest uppercase mb-1">This Month</p>
-          <p className="text-2xl font-bold text-muted-foreground font-mono">$-</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Earnings available in Phase 6</p>
+        <div className="mx-3 mb-3 p-4 rounded-xl bg-[#0B0F1A] border border-[#2A3050]">
+          <p className="text-xs font-semibold text-[#94A3B8] tracking-widest uppercase mb-1">This Month</p>
+          <p className="text-2xl font-bold text-[#94A3B8] font-mono">$-</p>
+          <p className="text-xs text-[#94A3B8] mt-0.5">Earnings available in Phase 6</p>
         </div>
       )}
 
-      <div className="mx-3 mb-3 p-3 rounded-xl bg-secondary border border-border">
+      <div className="mx-3 mb-3 p-3 rounded-xl bg-[#0B0F1A] border border-[#2A3050]">
         <div className="flex items-center gap-3">
           {user?.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={user.avatar_url}
               alt=""
-              className="w-9 h-9 rounded-full object-cover border border-border"
+              className="w-9 h-9 rounded-full object-cover border border-[#2A3050]"
             />
           ) : (
             <div className="w-9 h-9 rounded-full bg-[#6C5CE7]/20 text-[#6C5CE7] flex items-center justify-center text-xs font-bold">
@@ -166,10 +166,10 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">
+            <p className="text-sm font-semibold text-[#E2E8F0] truncate">
               {user?.name || (loaded ? "Guest" : "Loading...")}
             </p>
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-xs text-[#94A3B8] truncate">
               {user && role ? role.charAt(0) + role.slice(1).toLowerCase() : ""}
             </p>
           </div>
@@ -177,7 +177,7 @@ export function SidebarNav(_: { mode?: "creator" | "brand" }) {
         <div className="mt-2 flex items-center gap-1">
           <Link
             href="/settings"
-            className="flex-1 flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground py-1.5 rounded-md hover:bg-muted transition-colors"
+            className="flex-1 flex items-center justify-center gap-1 text-xs text-[#94A3B8] hover:text-[#E2E8F0] py-1.5 rounded-md hover:bg-[#131825] transition-colors"
           >
             <Settings size={13} />
             Settings

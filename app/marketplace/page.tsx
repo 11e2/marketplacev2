@@ -125,7 +125,7 @@ function MarketplaceInner() {
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
-      <SidebarNav mode="creator" />
+      <SidebarNav />
 
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="sticky top-0 z-30 bg-[#0B0F1A]/90 backdrop-blur border-b border-[#2A3050] px-6 py-4">
