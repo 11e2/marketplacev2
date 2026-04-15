@@ -80,13 +80,25 @@ export function ApplyModal({
           <Textarea
             id="apply-message"
             value={message}
-            onChange={(e) => setMessage(e.target.value.slice(0, MAX))}
+            onChange={(e) => setMessage(e.target.value)}
+            maxLength={MAX}
             placeholder="Tell the brand why you're a great fit, your audience, or ideas for this campaign."
             rows={6}
+            autoFocus
             className="bg-[#0B0F1A] border-[#2A3050] text-[#E2E8F0] placeholder:text-[#8892A8] resize-none"
             disabled={submitting}
           />
-          <div className="flex justify-end text-xs text-[#8892A8] font-mono">
+          <div
+            className="flex justify-end text-xs font-mono"
+            style={{
+              color:
+                message.length >= MAX
+                  ? "#FF6B6B"
+                  : message.length >= MAX * 0.8
+                    ? "#FF9F43"
+                    : "#8892A8",
+            }}
+          >
             {message.length} / {MAX}
           </div>
         </div>

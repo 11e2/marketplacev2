@@ -3,9 +3,10 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Search, Zap, Sparkles, TrendingUp, Loader2, AlertCircle } from "lucide-react"
+import { Search, Zap, Sparkles, TrendingUp, Loader2, AlertCircle, ArrowRight } from "lucide-react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState, SkeletonCard } from "@/components/empty-state"
+import { VerifiedBadge } from "@/components/verified-badge"
 
 const filterPills = ["All", "Clipping", "TikTok", "Reels", "Shorts", "YouTube", "Twitter/X", "Discord", "Newsletter", "Podcast"]
 const PAGE_SIZE = 12
@@ -25,6 +26,7 @@ interface Campaign {
   owner: { name: string | null; avatar_url: string | null } | null
   spotsRemaining: number | null
   percentBudgetUsed: number
+  brand_is_verified?: boolean | null
 }
 
 function MarketplaceInner() {
@@ -45,6 +47,7 @@ function MarketplaceInner() {
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), 300)
@@ -71,6 +74,7 @@ function MarketplaceInner() {
     },
     [activeFilter, debouncedSearch],
   )
+
 
   const reqIdRef = useRef(0)
 
@@ -101,7 +105,7 @@ function MarketplaceInner() {
       .finally(() => {
         if (reqIdRef.current === id) setLoading(false)
       })
-  }, [buildParams])
+  }, [buildParams, retryNonce])
 
   async function loadMore() {
     if (loadingMore || !hasMore) return
@@ -149,7 +153,7 @@ function MarketplaceInner() {
                 key={pill}
                 onClick={() => setActiveFilter(pill)}
                 aria-pressed={activeFilter === pill}
-                className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5"
+                className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7]"
                 style={
                   activeFilter === pill
                     ? { backgroundColor: "#6C5CE7", borderColor: "#6C5CE7", color: "#fff" }
@@ -169,12 +173,18 @@ function MarketplaceInner() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-[#E2E8F0]">Campaigns</h2>
                 <span className="text-sm text-[#8892A8]">
-                  {loading ? "Loading..." : `${total} available`}
+                  {loading
+                    ? "Loading..."
+                    : total > 0
+                      ? `Showing ${list.length} of ${total}`
+                      : "0 available"}
                 </span>
               </div>
 
               {loading ? (
                 <div className="grid md:grid-cols-2 gap-4">
+                  <SkeletonCard />
+                  <SkeletonCard />
                   <SkeletonCard />
                   <SkeletonCard />
                   <SkeletonCard />
@@ -187,7 +197,7 @@ function MarketplaceInner() {
                   description={error}
                   action={
                     <button
-                      onClick={() => setDebouncedSearch((s) => s)}
+                      onClick={() => setRetryNonce((n) => n + 1)}
                       className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
                     >
                       Retry
@@ -202,6 +212,20 @@ function MarketplaceInner() {
                     debouncedSearch || activeFilter !== "All"
                       ? "Try a different search or filter."
                       : "Campaigns will appear here as brands publish them."
+                  }
+                  action={
+                    debouncedSearch || activeFilter !== "All" ? (
+                      <button
+                        onClick={() => {
+                          setSearchInput("")
+                          setDebouncedSearch("")
+                          setActiveFilter("All")
+                        }}
+                        className="bg-[#131825] border border-[#2A3050] hover:border-[#6C5CE7] text-[#E2E8F0] text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                      >
+                        Clear filters
+                      </button>
+                    ) : undefined
                   }
                 />
               ) : (
@@ -225,8 +249,9 @@ function MarketplaceInner() {
                                   {(c.owner?.name || "?").charAt(0).toUpperCase()}
                                 </div>
                               )}
-                              <span className="text-xs font-semibold text-[#E2E8F0] truncate">
+                              <span className="text-xs font-semibold text-[#E2E8F0] truncate inline-flex items-center gap-1">
                                 {c.owner?.name || "Brand"}
+                                <VerifiedBadge verified={c.brand_is_verified} size={11} />
                               </span>
                             </div>
                             {c.type === "CLIPPING" && c.cpm != null && (
@@ -254,9 +279,7 @@ function MarketplaceInner() {
                                 ${Number(c.total_budget).toLocaleString()}
                               </span>
                             </span>
-                            <span className="bg-[#6C5CE7] text-white font-semibold px-3 py-1 rounded-md">
-                              View
-                            </span>
+                            <ArrowRight size={16} className="text-[#6C5CE7]" />
                           </div>
                         </div>
                       </Link>

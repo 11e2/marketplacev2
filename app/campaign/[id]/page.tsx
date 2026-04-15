@@ -116,6 +116,13 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
   const isOwner = meId && campaign && meId === campaign.brand_user_id
 
+  function getCampaignUnavailableReason(c: CampaignDetail): string | null {
+    if (c.status !== "ACTIVE") return "This campaign is no longer accepting applications."
+    if (c.remaining_budget <= 0) return "This campaign has exhausted its budget."
+    if (c.spotsRemaining === 0) return "All spots have been filled."
+    return null
+  }
+
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
       <SidebarNav />
@@ -247,6 +254,9 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                     style={{ width: `${100 - campaign.percentBudgetUsed}%` }}
                   />
                 </div>
+                <p className="text-[10px] text-[#8892A8] mt-1 font-mono">
+                  {Math.round(100 - campaign.percentBudgetUsed)}% remaining
+                </p>
               </div>
               <div className="bg-[#131825] border border-[#2A3050] rounded-xl p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8892A8] mb-1">
@@ -299,10 +309,15 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                   Applied
                 </span>
               ) : checkingApplication ? (
-                <span className="inline-flex items-center gap-2 text-xs text-[#8892A8] px-4 py-2.5">
+                <button
+                  disabled
+                  className="bg-[#6C5CE7] opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-xl inline-flex items-center gap-2"
+                >
                   <Loader2 size={14} className="animate-spin" />
-                  Checking...
-                </span>
+                  {campaign.type === "CLIPPING" ? "Open Video Studio" : "Apply Now"}
+                </button>
+              ) : getCampaignUnavailableReason(campaign) ? (
+                <span className="text-xs text-[#8892A8] italic">{getCampaignUnavailableReason(campaign)}</span>
               ) : (
                 <button
                   onClick={handleApply}

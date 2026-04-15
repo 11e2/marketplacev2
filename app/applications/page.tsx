@@ -33,7 +33,7 @@ const STATUS_META: Record<Status, { label: string; color: string; bg: string; Ic
   COMPLETED: { label: "Completed", color: "#6C5CE7", bg: "#6C5CE720", Icon: CheckCircle2 },
 }
 
-const TABS: (Status | "ALL")[] = ["ALL", "PENDING", "ACCEPTED", "REJECTED"]
+const TABS: (Status | "ALL")[] = ["ALL", "PENDING", "ACCEPTED", "COMPLETED", "REJECTED"]
 
 export default function MyApplicationsPage() {
   const [apps, setApps] = useState<ApplicationRow[] | null>(null)
@@ -80,7 +80,7 @@ export default function MyApplicationsPage() {
   }, [apps, tab])
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { ALL: apps?.length ?? 0, PENDING: 0, ACCEPTED: 0, REJECTED: 0 }
+    const c: Record<string, number> = { ALL: apps?.length ?? 0, PENDING: 0, ACCEPTED: 0, COMPLETED: 0, REJECTED: 0 }
     for (const a of apps ?? []) c[a.status] = (c[a.status] ?? 0) + 1
     return c
   }, [apps])
@@ -101,7 +101,7 @@ export default function MyApplicationsPage() {
               key={t}
               onClick={() => setTab(t)}
               aria-pressed={tab === t}
-              className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1.5"
+              className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7]"
               style={
                 tab === t
                   ? { backgroundColor: "#6C5CE7", borderColor: "#6C5CE7", color: "#fff" }
@@ -151,7 +151,7 @@ export default function MyApplicationsPage() {
                 <Link
                   key={a.id}
                   href={a.campaign ? `/campaign/${a.campaign.id}` : "/marketplace"}
-                  className="block bg-[#131825] border border-[#2A3050] rounded-2xl overflow-hidden hover:border-[#6C5CE7] transition-colors"
+                  className={`block bg-[#131825] border border-[#2A3050] rounded-2xl overflow-hidden hover:border-[#6C5CE7] transition-colors${!a.campaign || a.campaign.status !== "ACTIVE" ? " opacity-60" : ""}`}
                 >
                   <div
                     className="h-1"
