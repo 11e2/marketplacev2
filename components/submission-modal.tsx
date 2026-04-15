@@ -83,13 +83,20 @@ export function SubmissionModal({
         <DialogHeader>
           <DialogTitle className="text-[#E2E8F0]">Submit deliverable</DialogTitle>
           <DialogDescription className="text-[#8892A8]">
-            Share the link to your published content. The deal moves to DELIVERED on submit.
+            Share the link to your published content. The brand will be notified to review.
           </DialogDescription>
         </DialogHeader>
 
+        <p className="text-xs text-[#8892A8] bg-[#0B0F1A] border border-[#2A3050] rounded-lg px-3 py-2">
+          At least one of <span className="text-[#E2E8F0] font-semibold">Platform post URL</span> or{" "}
+          <span className="text-[#E2E8F0] font-semibold">Video file URL</span> is required.
+        </p>
+
         <div className="space-y-3">
           <div>
-            <Label className="text-[#E2E8F0] text-sm mb-1.5 block">Platform post URL</Label>
+            <Label className="text-[#E2E8F0] text-sm mb-1.5 block">
+              Platform post URL <span className="text-[#FF9F43]">*</span>
+            </Label>
             <input
               type="url"
               value={platformPostUrl}
@@ -100,7 +107,9 @@ export function SubmissionModal({
             />
           </div>
           <div>
-            <Label className="text-[#E2E8F0] text-sm mb-1.5 block">Video file URL (optional)</Label>
+            <Label className="text-[#E2E8F0] text-sm mb-1.5 block">
+              Video file URL <span className="text-[#FF9F43]">*</span>
+            </Label>
             <input
               type="url"
               value={videoUrl}

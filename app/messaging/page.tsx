@@ -177,8 +177,11 @@ export default function MessagingPage() {
                     </p>
                   </div>
                   {c.unread_count > 0 && (
-                    <div className="w-6 h-6 rounded-full bg-[#6C5CE7] flex items-center justify-center text-[11px] font-bold text-white shrink-0">
-                      {c.unread_count}
+                    <div
+                      aria-label={`${c.unread_count} unread`}
+                      className="min-w-6 h-6 px-1.5 rounded-full bg-[#6C5CE7] flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                    >
+                      {c.unread_count > 99 ? "99+" : c.unread_count}
                     </div>
                   )}
                 </Link>

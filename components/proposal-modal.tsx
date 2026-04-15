@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Loader2, Plus, X } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -18,11 +18,13 @@ export function ProposalModal({
   open,
   onOpenChange,
   dealId,
+  initialRate,
   onCreated,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   dealId: string
+  initialRate?: number
   onCreated?: () => void
 }) {
   const [rate, setRate] = useState("")
@@ -30,6 +32,12 @@ export function ProposalModal({
   const [message, setMessage] = useState("")
   const [deliverables, setDeliverables] = useState<{ name: string; detail: string }[]>([{ name: "", detail: "" }])
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (open && initialRate != null) setRate(String(initialRate))
+  }, [open, initialRate])
+
+  const MAX_DELIVERABLES = 10
 
   const inputCls =
     "w-full bg-[#0B0F1A] border border-[#2A3050] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] placeholder:text-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
@@ -110,9 +118,13 @@ export function ProposalModal({
               <Label className="text-[#E2E8F0] text-sm">Deliverables</Label>
               <button
                 type="button"
-                onClick={() => setDeliverables((d) => [...d, { name: "", detail: "" }])}
-                className="text-[11px] text-[#6C5CE7] hover:underline inline-flex items-center gap-1"
-                disabled={submitting}
+                onClick={() =>
+                  setDeliverables((d) =>
+                    d.length >= MAX_DELIVERABLES ? d : [...d, { name: "", detail: "" }],
+                  )
+                }
+                className="text-[11px] text-[#6C5CE7] hover:underline inline-flex items-center gap-1 disabled:opacity-50"
+                disabled={submitting || deliverables.length >= MAX_DELIVERABLES}
               >
                 <Plus size={10} /> Add
               </button>

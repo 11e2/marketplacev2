@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState } from "@/components/empty-state"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import {
   BadgeCheck,
   Link2,
@@ -61,6 +62,7 @@ export default function LinkedAccountsPage() {
   const [items, setItems] = useState<LinkedAccount[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
+  const [pendingDisconnect, setPendingDisconnect] = useState<{ id: string; label: string } | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -80,7 +82,6 @@ export default function LinkedAccountsPage() {
   }, [load])
 
   async function disconnect(id: string) {
-    if (!confirm("Disconnect this account? You can reconnect anytime.")) return
     setDisconnecting(id)
     try {
       const r = await fetch(`/api/users/me/linked-accounts?id=${id}`, { method: "DELETE" })
@@ -98,6 +99,8 @@ export default function LinkedAccountsPage() {
   }
 
   function connect(platform: Platform) {
+    const label = ALL_PLATFORMS.find((p) => p.key === platform)?.label ?? platform
+    toast.info(`Redirecting to ${label}...`)
     window.location.href = `/api/users/me/linked-accounts/${platform.toLowerCase()}/connect`
   }
 
@@ -170,11 +173,24 @@ export default function LinkedAccountsPage() {
                             </div>
                           </div>
                           <button
-                            onClick={() => disconnect(a.id)}
+                            onClick={() =>
+                              setPendingDisconnect({
+                                id: a.id,
+                                label: meta?.label ?? a.platform,
+                              })
+                            }
                             disabled={disconnecting === a.id}
-                            className="text-xs font-semibold text-[#FF6B6B] hover:bg-[#FF6B6B]/10 px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
+                            aria-busy={disconnecting === a.id}
+                            className="text-xs font-semibold text-[#FF6B6B] hover:bg-[#FF6B6B]/10 px-3 py-1.5 rounded-md transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
                           >
-                            {disconnecting === a.id ? "..." : "Disconnect"}
+                            {disconnecting === a.id ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" />
+                                Disconnecting
+                              </>
+                            ) : (
+                              "Disconnect"
+                            )}
                           </button>
                         </div>
 
@@ -248,6 +264,18 @@ export default function LinkedAccountsPage() {
             )}
           </>
         )}
+        <ConfirmDialog
+          open={!!pendingDisconnect}
+          onOpenChange={(v) => !v && setPendingDisconnect(null)}
+          title={`Disconnect ${pendingDisconnect?.label ?? "account"}?`}
+          description="You can reconnect anytime. Stats will stop syncing and this platform's verification will be removed."
+          confirmLabel="Disconnect"
+          variant="destructive"
+          onConfirm={async () => {
+            if (pendingDisconnect) await disconnect(pendingDisconnect.id)
+            setPendingDisconnect(null)
+          }}
+        />
       </main>
     </div>
   )

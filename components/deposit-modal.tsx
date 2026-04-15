@@ -27,10 +27,21 @@ export function DepositModal({
   const [amount, setAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
+  const MAX = 1_000_000
+
   async function submit() {
-    const n = Number(amount)
-    if (!n || n <= 0) {
+    const trimmed = amount.trim()
+    if (/e/i.test(trimmed)) {
+      toast.error("Enter a plain number, no scientific notation")
+      return
+    }
+    const n = Number(trimmed)
+    if (!Number.isFinite(n) || n <= 0) {
       toast.error("Enter a positive amount")
+      return
+    }
+    if (n > MAX) {
+      toast.error(`Maximum deposit is $${MAX.toLocaleString()}`)
       return
     }
     setSubmitting(true)
@@ -79,16 +90,22 @@ export function DepositModal({
 
           <div>
             <Label className="text-[#E2E8F0] text-sm mb-1.5 block">Amount (USD)</Label>
-            <input
-              type="number"
-              inputMode="decimal"
-              min={1}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="100"
-              className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-lg px-3 py-2 text-sm text-[#E2E8F0] placeholder:text-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
-              disabled={submitting}
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8892A8] font-mono">$</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={1}
+                max={MAX}
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="100.00"
+                className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-lg pl-7 pr-3 py-2 text-sm text-[#E2E8F0] placeholder:text-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
+                disabled={submitting}
+              />
+            </div>
+            <p className="text-[11px] text-[#8892A8] mt-1">Max ${MAX.toLocaleString()} per deposit.</p>
           </div>
         </div>
 

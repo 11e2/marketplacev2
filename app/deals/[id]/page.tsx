@@ -19,6 +19,7 @@ import { toast } from "sonner"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState } from "@/components/empty-state"
 import { VerifiedBadge } from "@/components/verified-badge"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import { ProposalModal } from "@/components/proposal-modal"
 import { SubmissionModal } from "@/components/submission-modal"
 import { createBrowserSupabase } from "@/lib/supabase-browser"
@@ -139,6 +140,10 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
   const [submissionOpen, setSubmissionOpen] = useState(false)
   const [busyProposal, setBusyProposal] = useState<string | null>(null)
   const [busySubmission, setBusySubmission] = useState<string | null>(null)
+  const [declineProposalId, setDeclineProposalId] = useState<string | null>(null)
+  const [rejectSubmissionId, setRejectSubmissionId] = useState<string | null>(null)
+  const [pendingTransition, setPendingTransition] = useState<DealStatus | null>(null)
+  const [counterFromRate, setCounterFromRate] = useState<number | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -242,7 +247,6 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
 
   async function proposalAction(pid: string, action: "accept" | "decline") {
     if (busyProposal) return
-    if (action === "decline" && !confirm("Decline this proposal?")) return
     setBusyProposal(pid)
     try {
       const r = await fetch(`/api/deals/${id}/proposals/${pid}/${action}`, { method: "POST" })
@@ -257,12 +261,8 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  async function reviewSubmission(sid: string, decision: "APPROVED" | "REJECTED") {
+  async function reviewSubmission(sid: string, decision: "APPROVED" | "REJECTED", notes?: string) {
     if (busySubmission) return
-    const notes =
-      decision === "REJECTED"
-        ? prompt("Notes for the creator (optional, 2000 chars max):") ?? undefined
-        : undefined
     setBusySubmission(sid)
     try {
       const r = await fetch(`/api/deals/${id}/submissions/${sid}/review`, {
@@ -416,27 +416,32 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
 
           {transitions && transitions.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4">
-              {transitions.map((t) => (
-                <button
-                  key={t.next}
-                  onClick={() => transition(t.next)}
-                  disabled={transitioning}
-                  className={
-                    t.next === "CANCELLED" || t.next === "DISPUTED"
-                      ? "border border-[#FF6B6B]/40 text-[#FF6B6B] hover:bg-[#FF6B6B]/10 text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-50"
-                      : "bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-50"
-                  }
-                >
-                  {transitioning ? "Updating..." : t.label}
-                </button>
-              ))}
+              {transitions.map((t) => {
+                const needsConfirm = t.next === "CANCELLED" || t.next === "DISPUTED"
+                return (
+                  <button
+                    key={t.next}
+                    onClick={() => (needsConfirm ? setPendingTransition(t.next) : transition(t.next))}
+                    disabled={transitioning}
+                    className={
+                      needsConfirm
+                        ? "border border-[#FF6B6B]/40 text-[#FF6B6B] hover:bg-[#FF6B6B]/10 text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-50"
+                        : "bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-50"
+                    }
+                  >
+                    {transitioning ? "Updating..." : t.label}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
 
-        <div className="grid lg:grid-cols-[1fr_320px] gap-4">
+        <div className="flex flex-col-reverse lg:grid lg:grid-cols-[1fr_320px] gap-4">
           {/* Messages column */}
-          <div className="bg-[#131825] border border-[#2A3050] rounded-2xl flex flex-col" style={{ minHeight: 500 }}>
+          <div
+            className="bg-[#131825] border border-[#2A3050] rounded-2xl flex flex-col min-h-[360px] lg:min-h-[500px]"
+          >
             <div className="px-5 py-3 border-b border-[#2A3050]">
               <h2 className="text-sm font-bold text-[#E2E8F0]">Conversation</h2>
             </div>
@@ -450,7 +455,7 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
                   const isMe = m.sender_id === meId
                   return (
                     <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                      <div className="max-w-sm">
+                      <div className="max-w-[75%]">
                         <div
                           className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words"
                           style={
@@ -581,14 +586,17 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
                               Accept
                             </button>
                             <button
-                              onClick={() => setProposalOpen(true)}
+                              onClick={() => {
+                                setCounterFromRate(Number(p.proposed_rate))
+                                setProposalOpen(true)
+                              }}
                               disabled={busyProposal === p.id}
                               className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-md border border-[#FF9F43] text-[#FF9F43] hover:bg-[#FF9F4315] disabled:opacity-60"
                             >
                               Counter
                             </button>
                             <button
-                              onClick={() => proposalAction(p.id, "decline")}
+                              onClick={() => setDeclineProposalId(p.id)}
                               disabled={busyProposal === p.id}
                               className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-md border border-[#FF6B6B] text-[#FF6B6B] hover:bg-[#FF6B6B15] disabled:opacity-60"
                             >
@@ -693,7 +701,7 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
                               Approve
                             </button>
                             <button
-                              onClick={() => reviewSubmission(s.id, "REJECTED")}
+                              onClick={() => setRejectSubmissionId(s.id)}
                               disabled={busySubmission === s.id}
                               className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-md border border-[#FF6B6B] text-[#FF6B6B] hover:bg-[#FF6B6B15] disabled:opacity-60"
                             >
@@ -712,8 +720,12 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
 
         <ProposalModal
           open={proposalOpen}
-          onOpenChange={setProposalOpen}
+          onOpenChange={(v) => {
+            setProposalOpen(v)
+            if (!v) setCounterFromRate(null)
+          }}
           dealId={deal.id}
+          initialRate={counterFromRate ?? undefined}
           onCreated={load}
         />
         <SubmissionModal
@@ -721,6 +733,60 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
           onOpenChange={setSubmissionOpen}
           dealId={deal.id}
           onCreated={load}
+        />
+
+        <ConfirmDialog
+          open={!!declineProposalId}
+          onOpenChange={(v) => !v && setDeclineProposalId(null)}
+          title="Decline this proposal?"
+          description="The other party will be notified. They can still send a new proposal."
+          confirmLabel="Decline"
+          variant="destructive"
+          onConfirm={async () => {
+            if (declineProposalId) await proposalAction(declineProposalId, "decline")
+            setDeclineProposalId(null)
+          }}
+        />
+
+        <ConfirmDialog
+          open={!!rejectSubmissionId}
+          onOpenChange={(v) => !v && setRejectSubmissionId(null)}
+          title="Request revision"
+          description="Share what needs to change. The creator will see this note."
+          confirmLabel="Send feedback"
+          variant="destructive"
+          promptLabel="Notes for the creator"
+          promptPlaceholder="What should they change?"
+          promptMaxLength={2000}
+          onConfirm={async (note) => {
+            if (rejectSubmissionId) await reviewSubmission(rejectSubmissionId, "REJECTED", note)
+            setRejectSubmissionId(null)
+          }}
+        />
+
+        <ConfirmDialog
+          open={!!pendingTransition}
+          onOpenChange={(v) => !v && setPendingTransition(null)}
+          title={
+            pendingTransition === "CANCELLED"
+              ? "Cancel this deal?"
+              : pendingTransition === "DISPUTED"
+                ? "Open a dispute?"
+                : "Confirm"
+          }
+          description={
+            pendingTransition === "CANCELLED"
+              ? "Escrow is refunded to the brand. This action cannot be undone."
+              : pendingTransition === "DISPUTED"
+                ? "An admin will review the deal. Escrow stays held until resolution."
+                : undefined
+          }
+          confirmLabel={pendingTransition === "CANCELLED" ? "Cancel deal" : "Open dispute"}
+          variant="destructive"
+          onConfirm={async () => {
+            if (pendingTransition) await transition(pendingTransition)
+            setPendingTransition(null)
+          }}
         />
       </main>
     </div>
