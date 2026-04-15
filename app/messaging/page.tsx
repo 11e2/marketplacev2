@@ -1,429 +1,184 @@
 "use client"
 
-import { useState } from "react"
-import { Send, Paperclip, Smile, Check, CheckCheck, Clock } from "lucide-react"
-import { toast } from "sonner"
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { AlertCircle, MessageSquare } from "lucide-react"
 import { SidebarNav } from "@/components/sidebar-nav"
-import { ChannelChip, StatusPill } from "@/components/channel-chip"
+import { EmptyState, SkeletonCard } from "@/components/empty-state"
+import { createBrowserSupabase } from "@/lib/supabase-browser"
 
-interface Message {
-  id: number
-  from: string
-  text?: string
-  time: string
-  read: boolean
-  isProposal?: boolean
+interface Conversation {
+  id: string
+  deal_id: string
+  campaign_id: string | null
+  brand_user_id: string
+  creator_user_id: string
+  last_message_at: string | null
+  created_at: string
+  unread_count: number
+  brand: { id: string; name: string | null; avatar_url: string | null } | null
+  creator: { id: string; name: string | null; avatar_url: string | null } | null
+  campaign: { id: string; title: string; channels: string[] } | null
 }
 
-const conversations = [
-  {
-    id: 1,
-    name: "NordVPN",
-    initial: "N",
-    color: "#6C5CE7",
-    preview: "Thanks for the counter-offer! We can meet at $200.",
-    time: "2m ago",
-    unread: 2,
-    type: "Negotiation",
-  },
-  {
-    id: 2,
-    name: "Shopify",
-    initial: "S",
-    color: "#00B894",
-    preview: "The thread looks great. Approved for publishing.",
-    time: "1h ago",
-    unread: 0,
-    type: "Campaign",
-  },
-  {
-    id: 3,
-    name: "Athletic Greens",
-    initial: "A",
-    color: "#FF9F43",
-    preview: "Can you record the ad read by Friday?",
-    time: "3h ago",
-    unread: 1,
-    type: "Negotiation",
-  },
-  {
-    id: 4,
-    name: "Morning Brew",
-    initial: "M",
-    color: "#4ECDC4",
-    preview: "Newsletter slot confirmed for next Tuesday.",
-    time: "Yesterday",
-    unread: 0,
-    type: "Campaign",
-  },
-]
-
-const threadsByConvo: Record<number, Message[]> = {
-  1: [
-    { id: 1, from: "brand", text: "Hi Alex! We love your content. We'd like to offer you a TikTok product demo for our Summer Campaign.", time: "2:14 PM", read: true },
-    { id: 2, from: "me", text: "Thanks for reaching out! I'd be happy to do a product demo. Could you share more details about the creative brief?", time: "2:31 PM", read: true },
-    { id: 3, from: "brand", text: "Of course! We're looking for a 30-60s natural integration. We're offering $150 for the post.", time: "2:35 PM", read: true },
-    { id: 4, from: "me", text: "That sounds great. Given my 8.4% engagement rate and 385K followers, I typically charge $200 for a 30-60s product demo. Would that work for your budget?", time: "2:48 PM", read: true },
-    { id: 5, from: "brand", isProposal: true, time: "3:02 PM", read: false },
-  ],
-  2: [
-    { id: 1, from: "brand", text: "Hi Alex, we'd love to partner on a Twitter/X thread series about e-commerce tips.", time: "10:00 AM", read: true },
-    { id: 2, from: "me", text: "I'd be interested! I have a lot of experience with e-commerce content. What's the scope?", time: "10:15 AM", read: true },
-    { id: 3, from: "brand", text: "5-7 tweet thread, $300 flat rate. We'll provide key talking points but want your authentic voice.", time: "10:22 AM", read: true },
-    { id: 4, from: "me", text: "That works for me. I'll draft something and send it over for review by Wednesday.", time: "10:30 AM", read: true },
-    { id: 5, from: "brand", text: "The thread looks great. Approved for publishing. Go ahead whenever you're ready!", time: "Yesterday", read: true },
-  ],
-  3: [
-    { id: 1, from: "brand", text: "Hey Alex, we loved your podcast demo. Want to do a dedicated pre-roll for our new product line?", time: "9:00 AM", read: true },
-    { id: 2, from: "me", text: "Absolutely! I've been using AG for a while so it would be very natural. What's the rate?", time: "9:20 AM", read: true },
-    { id: 3, from: "brand", text: "$400 for a 30s pre-roll read. Can you record the ad read by Friday?", time: "9:35 AM", read: false },
-  ],
-  4: [
-    { id: 1, from: "brand", text: "Hi Alex, we have a newsletter sponsorship slot opening next Tuesday. Interested?", time: "Mon 3:00 PM", read: true },
-    { id: 2, from: "me", text: "Yes! My newsletter has 22K subscribers in the gaming/tech niche. What's the format?", time: "Mon 3:15 PM", read: true },
-    { id: 3, from: "brand", text: "Full sponsored section, $500 flat. We'll send the copy and you can adjust tone.", time: "Mon 3:30 PM", read: true },
-    { id: 4, from: "me", text: "Deal. Send the copy over and I'll have it ready for Tuesday.", time: "Mon 3:45 PM", read: true },
-    { id: 5, from: "brand", text: "Newsletter slot confirmed for next Tuesday. Copy is in your inbox.", time: "Yesterday", read: true },
-  ],
+function relativeTime(iso: string | null) {
+  if (!iso) return ""
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return "just now"
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 7) return `${d}d ago`
+  return new Date(iso).toLocaleDateString()
 }
-
-const convoContext: Record<number, { campaign: string; brand: string; channel: string }> = {
-  1: { campaign: "TikTok Product Demo", brand: "NordVPN - Summer Campaign", channel: "TikTok" },
-  2: { campaign: "Twitter/X Thread Series", brand: "Shopify - E-commerce Tips", channel: "Twitter/X" },
-  3: { campaign: "Podcast Pre-Roll", brand: "Athletic Greens - Health Line", channel: "Podcast" },
-  4: { campaign: "Newsletter Sponsorship", brand: "Morning Brew - Finance Niche", channel: "Newsletter" },
-}
-
-const negotiationHistory = [
-  { label: "Initial Offer", amount: "$150", by: "NordVPN", time: "2:35 PM", color: "#8892A8" },
-  { label: "Counter Offer", amount: "$200", by: "You", time: "2:48 PM", color: "#FF9F43" },
-  { label: "Accepted", amount: "$200", by: "NordVPN", time: "3:02 PM", color: "#00B894" },
-]
 
 export default function MessagingPage() {
-  const [activeConvo, setActiveConvo] = useState(1)
-  const [activeTab, setActiveTab] = useState("All")
-  const [messageInput, setMessageInput] = useState("")
-  const [threads, setThreads] = useState(threadsByConvo)
-  const [proposalStatus, setProposalStatus] = useState<"pending" | "accepted" | "countered" | "declined">("pending")
+  const [items, setItems] = useState<Conversation[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [meId, setMeId] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
-  const currentMessages = threads[activeConvo] ?? []
-  const ctx = convoContext[activeConvo]
-  const activeConvoData = conversations.find((c) => c.id === activeConvo)
+  useEffect(() => {
+    const supabase = createBrowserSupabase()
+    supabase.auth.getUser().then(({ data }) => setMeId(data.user?.id ?? null))
+  }, [])
 
-  const sendMessage = () => {
-    if (!messageInput.trim()) return
-    const newMsg: Message = {
-      id: Date.now(),
-      from: "me",
-      text: messageInput.trim(),
-      time: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-      read: false,
+  useEffect(() => {
+    setError(null)
+    fetch("/api/messages/conversations", { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(j?.error?.message || "Failed to load messages")
+        return j
+      })
+      .then((j) => setItems(j.items ?? []))
+      .catch((e) => {
+        setError(e.message || "Failed to load messages")
+        setItems([])
+      })
+  }, [])
+
+  // Realtime: refetch conversations when any new message arrives.
+  useEffect(() => {
+    const supabase = createBrowserSupabase()
+    const channel = supabase
+      .channel("messages-inbox")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
+        fetch("/api/messages/conversations", { cache: "no-store" })
+          .then((r) => r.json())
+          .then((j) => setItems(j.items ?? []))
+          .catch(() => {})
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
     }
-    setThreads((prev) => ({
-      ...prev,
-      [activeConvo]: [...(prev[activeConvo] ?? []), newMsg],
-    }))
-    setMessageInput("")
-  }
+  }, [])
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
+  const filtered = useMemo(() => {
+    if (!items) return []
+    const q = search.trim().toLowerCase()
+    if (!q) return items
+    return items.filter((c) => {
+      const counterparty = meId === c.brand_user_id ? c.creator?.name : c.brand?.name
+      return (
+        counterparty?.toLowerCase().includes(q) ||
+        c.campaign?.title?.toLowerCase().includes(q)
+      )
+    })
+  }, [items, search, meId])
 
-  const handleProposalAction = (action: "accepted" | "countered" | "declined") => {
-    setProposalStatus(action)
-    const labels = { accepted: "Proposal accepted!", countered: "Counter-offer sent!", declined: "Proposal declined" }
-    const toastFn = action === "accepted" ? toast.success : action === "declined" ? toast.error : toast.info
-    toastFn(labels[action])
-  }
+  const totalUnread = useMemo(() => (items ?? []).reduce((s, c) => s + c.unread_count, 0), [items])
 
   return (
-    <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex overflow-hidden" style={{ height: "100vh" }}>
-      <SidebarNav mode="creator" />
+    <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
+      <SidebarNav />
 
-      <div className="flex flex-1 min-w-0 overflow-hidden">
-        {/* Conversations list */}
-        <div className="w-72 shrink-0 border-r border-[#2A3050] bg-[#131825] flex flex-col">
-          <div className="px-4 pt-4 pb-3 border-b border-[#2A3050]">
-            <h1 className="text-base font-bold text-[#E2E8F0] mb-3">Messages</h1>
-            <div className="flex gap-1">
-              {["All", "Campaigns", "Negotiations", "General"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className="text-[10px] font-semibold px-2.5 py-1 rounded-full transition-all"
-                  style={
-                    activeTab === tab
-                      ? { backgroundColor: "#6C5CE7", color: "#fff" }
-                      : { color: "#8892A8" }
-                  }
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {conversations.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setActiveConvo(c.id)
-                  if (c.id !== 1) setProposalStatus("pending")
-                }}
-                className="w-full px-4 py-3 flex items-start gap-3 border-b border-[#2A3050] text-left transition-colors"
-                style={
-                  activeConvo === c.id
-                    ? { backgroundColor: "rgba(108,92,231,0.10)" }
-                    : { backgroundColor: "transparent" }
-                }
-              >
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                  style={{ backgroundColor: c.color }}
-                >
-                  {c.initial}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-sm font-semibold text-[#E2E8F0]">{c.name}</span>
-                    <span className="text-[10px] text-[#8892A8]">{c.time}</span>
-                  </div>
-                  <p className="text-xs text-[#8892A8] truncate">{c.preview}</p>
-                </div>
-                {c.unread > 0 && (
-                  <div className="w-5 h-5 rounded-full bg-[#6C5CE7] flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
-                    {c.unread}
-                  </div>
-                )}
-              </button>
-            ))}
+      <main className="flex-1 min-w-0 px-6 py-6 max-w-4xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-bold text-[#E2E8F0]">Messages</h1>
+            <p className="text-sm text-[#8892A8]">
+              {totalUnread > 0 ? `${totalUnread} unread` : "Conversations tied to your deals."}
+            </p>
           </div>
         </div>
 
-        {/* Message thread */}
-        <div className="flex-1 min-w-0 flex flex-col bg-[#0B0F1A]">
-          {/* Thread header */}
-          <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#2A3050] bg-[#131825]">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-              style={{ backgroundColor: activeConvoData?.color ?? "#6C5CE7" }}
-            >
-              {activeConvoData?.initial ?? "?"}
-            </div>
-            <div>
-              <p className="text-sm font-bold text-[#E2E8F0]">{activeConvoData?.name}</p>
-              <p className="text-[10px] text-[#00B894]">Online now</p>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              {ctx && <ChannelChip channel={ctx.channel} />}
-              <span className="text-xs text-[#8892A8]">{ctx?.campaign}</span>
-            </div>
+        <div className="mb-4">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or campaign..."
+            aria-label="Search conversations"
+            className="w-full bg-[#131825] border border-[#2A3050] rounded-xl px-4 py-2.5 text-sm text-[#E2E8F0] placeholder-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
+          />
+        </div>
+
+        {items === null ? (
+          <div className="space-y-3">
+            <SkeletonCard />
+            <SkeletonCard />
           </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-            {currentMessages.map((msg) => {
-              if (msg.isProposal) {
-                return (
-                  <div key={msg.id} className="flex justify-start">
-                    <div className="max-w-sm w-full">
-                      <div className="bg-[#131825] border border-[#2A3050] rounded-2xl overflow-hidden shadow-lg">
-                        <div className="px-4 py-3 border-b border-[#2A3050] flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#6C5CE7]" />
-                          <span className="text-xs font-bold text-[#E2E8F0]">Negotiation Proposal</span>
-                          {proposalStatus !== "pending" && (
-                            <span
-                              className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
-                              style={{
-                                backgroundColor: proposalStatus === "accepted" ? "#00B89420" : proposalStatus === "declined" ? "#FF6B6B20" : "#FF9F4320",
-                                color: proposalStatus === "accepted" ? "#00B894" : proposalStatus === "declined" ? "#FF6B6B" : "#FF9F43",
-                              }}
-                            >
-                              {proposalStatus}
-                            </span>
-                          )}
-                        </div>
-                        <div className="p-4 space-y-2.5">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#8892A8]">Proposed Rate</span>
-                            <span className="font-bold font-mono text-[#00B894]">$200</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#8892A8]">Deliverables</span>
-                            <span className="font-medium text-[#E2E8F0] text-right ml-4">1 TikTok product demo, 30-60s</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#8892A8]">Timeline</span>
-                            <span className="font-medium text-[#E2E8F0]">Deliver within 5 days</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#8892A8]">Escrow</span>
-                            <span className="font-bold font-mono text-[#00B894]">$200 held</span>
-                          </div>
-                          {proposalStatus === "pending" && (
-                            <div className="flex gap-2 pt-2">
-                              <button onClick={() => handleProposalAction("accepted")} className="flex-1 py-2 rounded-lg bg-[#00B894] text-white text-xs font-bold hover:bg-[#009b7e] transition-colors">
-                                Accept
-                              </button>
-                              <button onClick={() => handleProposalAction("countered")} className="flex-1 py-2 rounded-lg border border-[#FF9F43] text-[#FF9F43] text-xs font-bold hover:bg-[#FF9F4315] transition-colors">
-                                Counter
-                              </button>
-                              <button onClick={() => handleProposalAction("declined")} className="flex-1 py-2 rounded-lg border border-[#FF6B6B] text-[#FF6B6B] text-xs font-bold hover:bg-[#FF6B6B15] transition-colors">
-                                Decline
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 mt-1 ml-1">
-                        <span className="text-[10px] text-[#8892A8]">{msg.time}</span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              const isMe = msg.from === "me"
+        ) : error ? (
+          <EmptyState icon={AlertCircle} title="Couldn't load messages" description={error} />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={MessageSquare}
+            title={search ? "No matches" : "No conversations yet"}
+            description={
+              search
+                ? "Try a different search."
+                : "Conversations appear here when a deal is created. Accept an applicant or offer a creator to start one."
+            }
+          />
+        ) : (
+          <div className="space-y-2">
+            {filtered.map((c) => {
+              const counterparty = meId === c.brand_user_id ? c.creator : c.brand
+              const name = counterparty?.name || "Unknown"
               return (
-                <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                  <div className="max-w-xs">
-                    <div
-                      className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
-                      style={
-                        isMe
-                          ? { backgroundColor: "#6C5CE7", color: "#fff" }
-                          : { backgroundColor: "#131825", color: "#E2E8F0", border: "1px solid #2A3050" }
-                      }
-                    >
-                      {msg.text}
+                <Link
+                  key={c.id}
+                  href={`/deals/${c.deal_id}`}
+                  className="flex items-center gap-3 p-4 bg-[#131825] border border-[#2A3050] rounded-2xl hover:border-[#6C5CE7] transition-colors"
+                >
+                  {counterparty?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={counterparty.avatar_url}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-[#6C5CE7]/20 text-[#6C5CE7] flex items-center justify-center text-xs font-bold shrink-0">
+                      {name.charAt(0).toUpperCase()}
                     </div>
-                    <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}>
-                      <span className="text-[10px] text-[#8892A8]">{msg.time}</span>
-                      {isMe && (
-                        msg.read
-                          ? <CheckCheck size={12} className="text-[#6C5CE7]" />
-                          : <Check size={12} className="text-[#8892A8]" />
-                      )}
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <p className="text-sm font-semibold text-[#E2E8F0] truncate">{name}</p>
+                      <span className="text-[10px] text-[#8892A8] shrink-0">
+                        {relativeTime(c.last_message_at || c.created_at)}
+                      </span>
                     </div>
+                    <p className="text-xs text-[#8892A8] truncate">
+                      {c.campaign?.title || "Direct deal"}
+                    </p>
                   </div>
-                </div>
+                  {c.unread_count > 0 && (
+                    <div className="w-6 h-6 rounded-full bg-[#6C5CE7] flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                      {c.unread_count}
+                    </div>
+                  )}
+                </Link>
               )
             })}
           </div>
-
-          {/* Input */}
-          <div className="px-5 py-4 border-t border-[#2A3050] bg-[#131825]">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => toast.info("File picker coming soon")}
-                className="text-[#8892A8] hover:text-[#E2E8F0] transition-colors"
-              >
-                <Paperclip size={18} />
-              </button>
-              <button
-                onClick={() => toast.info("Emoji picker coming soon")}
-                className="text-[#8892A8] hover:text-[#E2E8F0] transition-colors"
-              >
-                <Smile size={18} />
-              </button>
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={`Message ${activeConvoData?.name ?? ""}...`}
-                  className="w-full bg-[#0B0F1A] border border-[#2A3050] rounded-xl px-4 py-2.5 text-sm text-[#E2E8F0] placeholder-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
-                />
-              </div>
-              <button
-                onClick={sendMessage}
-                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
-                style={{ backgroundColor: messageInput ? "#6C5CE7" : "#1A2035" }}
-              >
-                <Send size={16} style={{ color: messageInput ? "#fff" : "#8892A8" }} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Context panel */}
-        <div className="hidden xl:flex w-72 shrink-0 flex-col border-l border-[#2A3050] bg-[#131825] overflow-y-auto">
-          <div className="px-4 py-4 border-b border-[#2A3050]">
-            <h2 className="text-xs font-bold text-[#8892A8] uppercase tracking-widest mb-3">Deal Context</h2>
-
-            {ctx && (
-              <>
-                <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3 mb-3">
-                  <p className="text-xs font-bold text-[#E2E8F0] mb-1">{ctx.campaign}</p>
-                  <p className="text-[11px] text-[#8892A8]">{ctx.brand}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <ChannelChip channel={ctx.channel} />
-                    <StatusPill status="Pending" />
-                  </div>
-                </div>
-
-                <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3 mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#6C5CE7] flex items-center justify-center text-white text-xs font-bold">
-                      AK
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-[#E2E8F0]">Alex Kowalski</p>
-                      <p className="text-[10px] text-[#8892A8]">385K TikTok - 8.4% eng.</p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {activeConvo === 1 && (
-            <>
-              <div className="px-4 py-4 border-b border-[#2A3050]">
-                <h2 className="text-xs font-bold text-[#8892A8] uppercase tracking-widest mb-3">Negotiation History</h2>
-                <div className="relative pl-4">
-                  <div className="absolute left-1.5 top-2 bottom-2 w-px bg-[#2A3050]" />
-                  <div className="space-y-4">
-                    {negotiationHistory.map((h, i) => (
-                      <div key={i} className="relative">
-                        <div
-                          className="absolute -left-[11px] top-1 w-2.5 h-2.5 rounded-full border-2"
-                          style={{ borderColor: h.color, backgroundColor: "#131825" }}
-                        />
-                        <p className="text-[11px] font-semibold text-[#E2E8F0]">{h.label}</p>
-                        <div className="flex items-center justify-between">
-                          <p className="text-[10px] text-[#8892A8]">{h.by} - {h.time}</p>
-                          <span className="text-[11px] font-bold font-mono" style={{ color: h.color }}>{h.amount}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="px-4 py-4">
-                <h2 className="text-xs font-bold text-[#8892A8] uppercase tracking-widest mb-3">Escrow</h2>
-                <div className="bg-[#0B0F1A] border border-[#2A3050] rounded-xl p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-[#8892A8]">Amount Held</span>
-                    <span className="text-sm font-bold font-mono text-[#00B894]">$200.00</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-[#00B894]">
-                    <Clock size={10} />
-                    Releases upon delivery approval
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+        )}
+      </main>
     </div>
   )
 }
