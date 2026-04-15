@@ -111,7 +111,9 @@ export const messageSchema = z.object({
 
 export const submissionSchema = z.object({
   videoUrl: z.string().url().optional(),
+  videoPath: z.string().min(1).max(500).optional(),
   processedVideoUrl: z.string().url().optional(),
+  processedVideoPath: z.string().min(1).max(500).optional(),
   contentUrl: z.string().url().optional(),
   platformPostUrl: z.string().url().optional(),
 })
