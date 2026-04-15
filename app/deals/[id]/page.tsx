@@ -134,6 +134,8 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
   const [transitioning, setTransitioning] = useState(false)
   const [proposalOpen, setProposalOpen] = useState(false)
   const [submissionOpen, setSubmissionOpen] = useState(false)
+  const [busyProposal, setBusyProposal] = useState<string | null>(null)
+  const [busySubmission, setBusySubmission] = useState<string | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -232,6 +234,47 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
       toast.error(e instanceof Error ? e.message : "Send failed")
     } finally {
       setSending(false)
+    }
+  }
+
+  async function proposalAction(pid: string, action: "accept" | "decline") {
+    if (busyProposal) return
+    if (action === "decline" && !confirm("Decline this proposal?")) return
+    setBusyProposal(pid)
+    try {
+      const r = await fetch(`/api/deals/${id}/proposals/${pid}/${action}`, { method: "POST" })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j?.error?.message || `${action} failed`)
+      toast.success(action === "accept" ? "Proposal accepted" : "Proposal declined")
+      await load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed")
+    } finally {
+      setBusyProposal(null)
+    }
+  }
+
+  async function reviewSubmission(sid: string, decision: "APPROVED" | "REJECTED") {
+    if (busySubmission) return
+    const notes =
+      decision === "REJECTED"
+        ? prompt("Notes for the creator (optional, 2000 chars max):") ?? undefined
+        : undefined
+    setBusySubmission(sid)
+    try {
+      const r = await fetch(`/api/deals/${id}/submissions/${sid}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, notes: notes || undefined }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j?.error?.message || "Review failed")
+      toast.success(decision === "APPROVED" ? "Submission approved, escrow released" : "Revision requested")
+      await load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed")
+    } finally {
+      setBusySubmission(null)
     }
   }
 
@@ -504,23 +547,51 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
                 <p className="text-xs text-[#8892A8]">No proposals yet.</p>
               ) : (
                 <ul className="space-y-3">
-                  {proposals.map((p) => (
-                    <li key={p.id} className="bg-[#0B0F1A] border border-[#2A3050] rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-bold font-mono text-[#00B894] inline-flex items-center gap-1">
-                          <DollarSign size={10} />
-                          {Number(p.proposed_rate).toLocaleString()}
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#8892A820] text-[#8892A8]">
-                          {p.status}
-                        </span>
-                      </div>
-                      {p.timeline && (
-                        <p className="text-[11px] text-[#8892A8] mb-1">Timeline: {p.timeline}</p>
-                      )}
-                      {p.message && <p className="text-[11px] text-[#E2E8F0]">{p.message}</p>}
-                    </li>
-                  ))}
+                  {proposals.map((p) => {
+                    const canAct = p.status === "PENDING" && p.from_user_id !== meId
+                    return (
+                      <li key={p.id} className="bg-[#0B0F1A] border border-[#2A3050] rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-bold font-mono text-[#00B894] inline-flex items-center gap-1">
+                            <DollarSign size={10} />
+                            {Number(p.proposed_rate).toLocaleString()}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#8892A820] text-[#8892A8]">
+                            {p.status}
+                          </span>
+                        </div>
+                        {p.timeline && (
+                          <p className="text-[11px] text-[#8892A8] mb-1">Timeline: {p.timeline}</p>
+                        )}
+                        {p.message && <p className="text-[11px] text-[#E2E8F0] mb-2">{p.message}</p>}
+                        {canAct && (
+                          <div className="flex gap-1.5 pt-2 border-t border-[#2A3050]">
+                            <button
+                              onClick={() => proposalAction(p.id, "accept")}
+                              disabled={busyProposal === p.id}
+                              className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-md bg-[#00B894] text-white hover:bg-[#009b7e] disabled:opacity-60"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => setProposalOpen(true)}
+                              disabled={busyProposal === p.id}
+                              className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-md border border-[#FF9F43] text-[#FF9F43] hover:bg-[#FF9F4315] disabled:opacity-60"
+                            >
+                              Counter
+                            </button>
+                            <button
+                              onClick={() => proposalAction(p.id, "decline")}
+                              disabled={busyProposal === p.id}
+                              className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-md border border-[#FF6B6B] text-[#FF6B6B] hover:bg-[#FF6B6B15] disabled:opacity-60"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>
@@ -580,28 +651,52 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
                   Submissions
                 </h3>
                 <ul className="space-y-2">
-                  {submissions.map((s) => (
-                    <li key={s.id} className="bg-[#0B0F1A] border border-[#2A3050] rounded-lg p-3 text-xs">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-[#E2E8F0] inline-flex items-center gap-1">
-                          <FileText size={12} /> Submission
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#6C5CE720] text-[#6C5CE7]">
-                          {s.status}
-                        </span>
-                      </div>
-                      {s.platform_post_url && (
-                        <a
-                          href={s.platform_post_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[11px] text-[#6C5CE7] hover:underline break-all"
-                        >
-                          {s.platform_post_url}
-                        </a>
-                      )}
-                    </li>
-                  ))}
+                  {submissions.map((s) => {
+                    const pending = s.status === "SUBMITTED" || s.status === "IN_REVIEW"
+                    return (
+                      <li key={s.id} className="bg-[#0B0F1A] border border-[#2A3050] rounded-lg p-3 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-[#E2E8F0] inline-flex items-center gap-1">
+                            <FileText size={12} /> Submission
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#6C5CE720] text-[#6C5CE7]">
+                            {s.status}
+                          </span>
+                        </div>
+                        {s.platform_post_url && (
+                          <a
+                            href={s.platform_post_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-[#6C5CE7] hover:underline break-all"
+                          >
+                            {s.platform_post_url}
+                          </a>
+                        )}
+                        <p className="text-[10px] text-[#8892A8] mt-1">
+                          {new Date(s.submitted_at).toLocaleString()}
+                        </p>
+                        {pending && (
+                          <div className="flex gap-1.5 mt-2 pt-2 border-t border-[#2A3050]">
+                            <button
+                              onClick={() => reviewSubmission(s.id, "APPROVED")}
+                              disabled={busySubmission === s.id}
+                              className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-md bg-[#00B894] text-white hover:bg-[#009b7e] disabled:opacity-60"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => reviewSubmission(s.id, "REJECTED")}
+                              disabled={busySubmission === s.id}
+                              className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-md border border-[#FF6B6B] text-[#FF6B6B] hover:bg-[#FF6B6B15] disabled:opacity-60"
+                            >
+                              Request revision
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             )}
