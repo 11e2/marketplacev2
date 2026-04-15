@@ -373,20 +373,20 @@ function VideoStudioContent() {
   }, [])
 
   const handleSubmitToCampaign = useCallback(async () => {
-    if (!activeDealId) return
-    const url = submitUrl.trim()
-    if (!url) {
-      toast.error("Paste the platform post URL")
-      return
-    }
-    try {
-      new URL(url)
-    } catch {
-      toast.error("Enter a valid URL")
-      return
-    }
+    if (submitting || !activeDealId) return
     setSubmitting(true)
     try {
+      const url = submitUrl.trim()
+      if (!url) {
+        toast.error("Paste the platform post URL")
+        return
+      }
+      try {
+        new URL(url)
+      } catch {
+        toast.error("Enter a valid URL")
+        return
+      }
       const r = await fetch(`/api/deals/${activeDealId}/submissions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -401,7 +401,7 @@ function VideoStudioContent() {
     } finally {
       setSubmitting(false)
     }
-  }, [activeDealId, submitUrl])
+  }, [activeDealId, submitUrl, submitting])
 
   const canProcess = videoFile && overlayImage && processingState !== "processing"
 
@@ -574,7 +574,18 @@ function VideoStudioContent() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3 p-3 bg-[#0B0F1A] rounded-lg">
-                  <div className="w-12 h-12 bg-white rounded flex items-center justify-center overflow-hidden">
+                  <div
+                    className="w-12 h-12 rounded flex items-center justify-center overflow-hidden"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(45deg, #2A3050 25%, transparent 25%), linear-gradient(-45deg, #2A3050 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2A3050 75%), linear-gradient(-45deg, transparent 75%, #2A3050 75%)",
+                      backgroundSize: "8px 8px",
+                      backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
+                      backgroundColor: "#131825",
+                    }}
+                    aria-label="Overlay transparency preview"
+                    title="Checkerboard shows transparent pixels in the overlay"
+                  >
                     <img src={overlayPreviewUrl} alt="Overlay" className="object-contain w-full h-full" />
                   </div>
                   <div className="flex-1 min-w-0">

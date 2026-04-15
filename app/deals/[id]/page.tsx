@@ -144,6 +144,7 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
   const [rejectSubmissionId, setRejectSubmissionId] = useState<string | null>(null)
   const [pendingTransition, setPendingTransition] = useState<DealStatus | null>(null)
   const [counterFromRate, setCounterFromRate] = useState<number | null>(null)
+  const [counterOfProposalId, setCounterOfProposalId] = useState<string | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -447,7 +448,17 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
             </div>
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
               {!messages ? (
-                <p className="text-sm text-[#8892A8]">Loading...</p>
+                <div className="space-y-3" aria-label="Loading messages">
+                  <div className="flex justify-start">
+                    <div className="h-9 w-48 rounded-2xl bg-[#0B0F1A] border border-[#2A3050] animate-pulse" />
+                  </div>
+                  <div className="flex justify-end">
+                    <div className="h-9 w-32 rounded-2xl bg-[#6C5CE7]/20 animate-pulse" />
+                  </div>
+                  <div className="flex justify-start">
+                    <div className="h-12 w-64 rounded-2xl bg-[#0B0F1A] border border-[#2A3050] animate-pulse" />
+                  </div>
+                </div>
               ) : messages.length === 0 ? (
                 <p className="text-sm text-[#8892A8]">No messages yet. Say hi.</p>
               ) : (
@@ -588,6 +599,7 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
                             <button
                               onClick={() => {
                                 setCounterFromRate(Number(p.proposed_rate))
+                                setCounterOfProposalId(p.id)
                                 setProposalOpen(true)
                               }}
                               disabled={busyProposal === p.id}
@@ -722,10 +734,14 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
           open={proposalOpen}
           onOpenChange={(v) => {
             setProposalOpen(v)
-            if (!v) setCounterFromRate(null)
+            if (!v) {
+              setCounterFromRate(null)
+              setCounterOfProposalId(null)
+            }
           }}
           dealId={deal.id}
           initialRate={counterFromRate ?? undefined}
+          counterOfProposalId={counterOfProposalId}
           onCreated={load}
         />
         <SubmissionModal

@@ -19,12 +19,14 @@ export function ProposalModal({
   onOpenChange,
   dealId,
   initialRate,
+  counterOfProposalId,
   onCreated,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   dealId: string
   initialRate?: number
+  counterOfProposalId?: string | null
   onCreated?: () => void
 }) {
   const [rate, setRate] = useState("")
@@ -51,7 +53,10 @@ export function ProposalModal({
     const cleanedDeliverables = deliverables.filter((d) => d.name.trim())
     setSubmitting(true)
     try {
-      const r = await fetch(`/api/deals/${dealId}/proposals`, {
+      const url = counterOfProposalId
+        ? `/api/deals/${dealId}/proposals/${counterOfProposalId}/counter`
+        : `/api/deals/${dealId}/proposals`
+      const r = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -63,7 +68,7 @@ export function ProposalModal({
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j?.error?.message || "Failed to send proposal")
-      toast.success("Proposal sent")
+      toast.success(counterOfProposalId ? "Counter-offer sent" : "Proposal sent")
       onOpenChange(false)
       setRate("")
       setTimeline("")
@@ -81,9 +86,13 @@ export function ProposalModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#131825] border-[#2A3050] text-[#E2E8F0] sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-[#E2E8F0]">New proposal</DialogTitle>
+          <DialogTitle className="text-[#E2E8F0]">
+            {counterOfProposalId ? "Counter the proposal" : "New proposal"}
+          </DialogTitle>
           <DialogDescription className="text-[#8892A8]">
-            Propose rate, deliverables, and timeline. The other party can accept, counter, or decline.
+            {counterOfProposalId
+              ? "The original proposal will be marked countered. Your new terms are sent in its place."
+              : "Propose rate, deliverables, and timeline. The other party can accept, counter, or decline."}
           </DialogDescription>
         </DialogHeader>
 
