@@ -12,7 +12,7 @@ import {
   BarChart2,
 } from "lucide-react"
 import { toast } from "sonner"
-import { tickerItems, channelCategories } from "@/lib/data"
+import { channelCategories } from "@/lib/data"
 
 const features = [
   {
@@ -119,18 +119,6 @@ export default function LandingPage() {
 
         {/* Scroll fade */}
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0B0F1A] to-transparent" />
-      </section>
-
-      {/* Social proof ticker */}
-      <section className="py-4 border-y border-[#2A3050] overflow-hidden bg-[#131825]">
-        <div className="flex animate-ticker whitespace-nowrap">
-          {[...tickerItems, ...tickerItems].map((item, i) => (
-            <span key={i} className="flex items-center gap-2 px-6 text-sm text-[#8892A8]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00B894]" />
-              {item.text}
-            </span>
-          ))}
-        </div>
       </section>
 
       {/* Features */}
