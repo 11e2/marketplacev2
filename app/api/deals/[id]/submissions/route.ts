@@ -18,7 +18,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       .eq("deal_id", id)
       .order("submitted_at", { ascending: false })
     if (error) throw new ApiError("INTERNAL", error.message)
-    return NextResponse.json({ submissions: data ?? [] })
+
+    // video_url / processed_video_url are paths in the private `submissions`
+    // bucket. Brands cannot read them directly (owner-folder RLS). The frontend
+    // should call GET /api/deals/[id]/submissions/[sid]/url to obtain a
+    // short-lived signed download URL for playback.
+    const submissions = (data ?? []).map((s) => ({
+      ...s,
+      video_stream_path: `/api/deals/${id}/submissions/${s.id}/url`,
+    }))
+    return NextResponse.json({ submissions })
   } catch (err) {
     return handleApiError(err)
   }
