@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import { createBrowserSupabase } from "@/lib/supabase"
+import { createBrowserSupabase } from "@/lib/supabase-browser"
 import { AuthShell, authInput, authButton, authLabel } from "@/components/auth-shell"
 
 export default function SignInPage() {

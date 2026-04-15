@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import { createBrowserSupabase } from "@/lib/supabase"
+import { createBrowserSupabase } from "@/lib/supabase-browser"
 import { authInput, authButton, authLabel } from "@/components/auth-shell"
 
 const NICHES = [

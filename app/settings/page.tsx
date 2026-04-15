@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { createServerSupabase } from "@/lib/supabase"
+import { createServerSupabase } from "@/lib/supabase-server"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { SettingsTabs } from "./settings-tabs"
 

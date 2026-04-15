@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 import { Mail } from "lucide-react"
-import { createBrowserSupabase } from "@/lib/supabase"
+import { createBrowserSupabase } from "@/lib/supabase-browser"
 import { AuthShell, authButton } from "@/components/auth-shell"
 
 export default function VerifyPage() {

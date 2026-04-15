@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { createBrowserSupabase } from "@/lib/supabase"
+import { createBrowserSupabase } from "@/lib/supabase-browser"
 
 const creatorNav = [
   { label: "Marketplace", href: "/marketplace", icon: Store },

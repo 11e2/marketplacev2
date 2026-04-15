@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { createServerSupabase } from "@/lib/supabase"
+import { createServerSupabase } from "@/lib/supabase-server"
 import { handleApiError, ApiError } from "@/lib/errors"
 
 const creatorSchema = z.object({

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { createBrowserSupabase } from "@/lib/supabase"
+import { createBrowserSupabase } from "@/lib/supabase-browser"
 
 interface ProfileData {
   email: string
