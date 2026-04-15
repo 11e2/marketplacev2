@@ -56,6 +56,30 @@ export const applyToCampaignSchema = z.object({
   message: z.string().max(1000).optional(),
 })
 
+export const campaignsListQuerySchema = z.object({
+  search: z.string().trim().max(200).optional(),
+  channels: z
+    .string()
+    .optional()
+    .transform((v) =>
+      v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
+    ),
+  type: campaignType.optional(),
+  minBudget: z.coerce.number().nonnegative().optional(),
+  maxBudget: z.coerce.number().nonnegative().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(60).default(24),
+})
+
+export const applicationsListQuerySchema = z.object({
+  status: z.enum(["PENDING", "ACCEPTED", "REJECTED", "COMPLETED"]).optional(),
+})
+
 export const proposalSchema = z.object({
   proposedRate: z.number().positive(),
   deliverables: z.array(z.object({ name: z.string(), detail: z.string().optional() })).default([]),

@@ -6,14 +6,17 @@ import { campaignType, campaignStatus } from "@/lib/validation"
 
 const listQuery = z.object({
   channel: z.string().optional(),
+  channels: z.string().optional(),
   type: campaignType.optional(),
   status: campaignStatus.optional(),
-  search: z.string().optional(),
+  search: z.string().trim().max(200).optional(),
   minBudget: z.coerce.number().nonnegative().optional(),
   maxBudget: z.coerce.number().nonnegative().optional(),
   mine: z.enum(["1", "true"]).optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(24),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(60).optional(),
 })
 
 // Drafts are intentionally permissive so brands can save partial work.
@@ -63,13 +66,21 @@ export async function GET(request: Request) {
       data: { user },
     } = await supabase.auth.getUser()
 
+    if (!q.mine && !user) throw new ApiError("UNAUTHORIZED", "Not signed in")
+
+    const usePagination = q.page !== undefined || q.pageSize !== undefined
+    const pageSize = q.pageSize ?? q.limit
+    const page = q.page ?? 1
+    const from = usePagination ? (page - 1) * pageSize : 0
+    const to = usePagination ? from + pageSize - 1 : pageSize - 1
+
     let query = supabase
       .from("campaigns")
       .select(
         "id, brand_user_id, title, description, type, status, channels, cpm, min_followers, min_views, total_budget, remaining_budget, spots, spots_remaining, brand_asset_url, accent_color, created_at, updated_at, owner:profiles!campaigns_brand_user_id_fkey(name, avatar_url)",
+        usePagination ? { count: "exact" } : undefined,
       )
       .order("created_at", { ascending: false })
-      .limit(q.limit)
 
     if (q.mine) {
       if (!user) throw new ApiError("UNAUTHORIZED", "Not signed in")
@@ -80,19 +91,44 @@ export async function GET(request: Request) {
     }
 
     if (q.type) query = query.eq("type", q.type)
-    if (q.channel) query = query.contains("channels", [q.channel])
+
+    const channelList = q.channels
+      ? q.channels
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : q.channel
+        ? [q.channel]
+        : []
+    if (channelList.length === 1) query = query.contains("channels", channelList)
+    else if (channelList.length > 1) query = query.overlaps("channels", channelList)
+
     if (q.minBudget !== undefined) query = query.gte("total_budget", q.minBudget)
     if (q.maxBudget !== undefined) query = query.lte("total_budget", q.maxBudget)
-    if (q.search) query = query.ilike("title", `%${q.search}%`)
-    if (q.cursor) query = query.lt("created_at", q.cursor)
+    if (q.search) {
+      const like = `%${q.search.replace(/[%_]/g, (c) => `\\${c}`)}%`
+      query = query.or(`title.ilike.${like},description.ilike.${like}`)
+    }
+    if (!usePagination && q.cursor) query = query.lt("created_at", q.cursor)
 
-    const { data, error } = await query
+    query = query.range(from, to)
+
+    const { data, error, count } = await query
     if (error) throw new ApiError("INTERNAL", error.message)
 
     const items = (data ?? []).map((row) => ({ ...row, ...computedFields(row as Record<string, unknown>) }))
-    const nextCursor =
-      items.length === q.limit ? (items[items.length - 1] as { created_at: string }).created_at : null
 
+    if (usePagination) {
+      const total = count ?? 0
+      const totalPages = Math.max(1, Math.ceil(total / pageSize))
+      return NextResponse.json({
+        items,
+        pagination: { page, pageSize, total, totalPages, hasMore: page < totalPages },
+      })
+    }
+
+    const nextCursor =
+      items.length === pageSize ? (items[items.length - 1] as { created_at: string }).created_at : null
     return NextResponse.json({ items, nextCursor })
   } catch (err) {
     return handleApiError(err)
