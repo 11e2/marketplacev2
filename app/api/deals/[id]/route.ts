@@ -47,7 +47,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (error) throw new ApiError("INTERNAL", error.message)
     if (!data) throw new ApiError("NOT_FOUND", "Deal not found")
 
-    return NextResponse.json({ deal: data })
+    const [{ data: bp }, { data: cp }] = await Promise.all([
+      supabase.from("brand_profiles").select("is_verified").eq("user_id", data.brand_user_id).maybeSingle(),
+      supabase.from("creator_profiles").select("is_verified").eq("user_id", data.creator_user_id).maybeSingle(),
+    ])
+
+    return NextResponse.json({
+      deal: {
+        ...data,
+        brand_is_verified: !!bp?.is_verified,
+        creator_is_verified: !!cp?.is_verified,
+      },
+    })
   } catch (err) {
     return handleApiError(err)
   }

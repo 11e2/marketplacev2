@@ -101,7 +101,21 @@ export async function GET(request: Request) {
     const { data, error, count } = await query
     if (error) throw new ApiError("INTERNAL", error.message)
 
-    const items = (data ?? []).map((row) => ({ ...row, ...computedFields(row as Record<string, unknown>) }))
+    const rows = data ?? []
+    const brandIds = Array.from(new Set(rows.map((r) => (r as { brand_user_id?: string }).brand_user_id).filter(Boolean))) as string[]
+    const verifiedByBrand = new Map<string, boolean>()
+    if (brandIds.length) {
+      const { data: bp } = await supabase
+        .from("brand_profiles")
+        .select("user_id, is_verified")
+        .in("user_id", brandIds)
+      for (const r of bp ?? []) verifiedByBrand.set(r.user_id, !!r.is_verified)
+    }
+    const items = rows.map((row) => ({
+      ...row,
+      ...computedFields(row as Record<string, unknown>),
+      brand_is_verified: verifiedByBrand.get((row as { brand_user_id: string }).brand_user_id) ?? false,
+    }))
 
     if (usePagination) {
       const total = count ?? 0

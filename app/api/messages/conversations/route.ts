@@ -21,21 +21,36 @@ export async function GET() {
 
     const convos = data ?? []
     const ids = convos.map((c) => c.id)
+    const brandIds = Array.from(new Set(convos.map((c) => c.brand_user_id).filter(Boolean))) as string[]
+    const creatorIds = Array.from(new Set(convos.map((c) => c.creator_user_id).filter(Boolean))) as string[]
+
     const unread = new Map<string, number>()
-    if (ids.length) {
-      const { data: msgs } = await supabase
-        .from("messages")
-        .select("conversation_id, sender_id, read_at")
-        .in("conversation_id", ids)
-      for (const m of msgs ?? []) {
-        if (m.sender_id !== user.id && !m.read_at) {
-          unread.set(m.conversation_id, (unread.get(m.conversation_id) ?? 0) + 1)
-        }
+    const [{ data: msgs }, { data: bp }, { data: cp }] = await Promise.all([
+      ids.length
+        ? supabase.from("messages").select("conversation_id, sender_id, read_at").in("conversation_id", ids)
+        : Promise.resolve({ data: [] as { conversation_id: string; sender_id: string; read_at: string | null }[] }),
+      brandIds.length
+        ? supabase.from("brand_profiles").select("user_id, is_verified").in("user_id", brandIds)
+        : Promise.resolve({ data: [] as { user_id: string; is_verified: boolean }[] }),
+      creatorIds.length
+        ? supabase.from("creator_profiles").select("user_id, is_verified").in("user_id", creatorIds)
+        : Promise.resolve({ data: [] as { user_id: string; is_verified: boolean }[] }),
+    ])
+    for (const m of msgs ?? []) {
+      if (m.sender_id !== user.id && !m.read_at) {
+        unread.set(m.conversation_id, (unread.get(m.conversation_id) ?? 0) + 1)
       }
     }
+    const brandVerified = new Map((bp ?? []).map((r) => [r.user_id, !!r.is_verified]))
+    const creatorVerified = new Map((cp ?? []).map((r) => [r.user_id, !!r.is_verified]))
 
     return NextResponse.json({
-      items: convos.map((c) => ({ ...c, unread_count: unread.get(c.id) ?? 0 })),
+      items: convos.map((c) => ({
+        ...c,
+        unread_count: unread.get(c.id) ?? 0,
+        brand_is_verified: brandVerified.get(c.brand_user_id) ?? false,
+        creator_is_verified: creatorVerified.get(c.creator_user_id) ?? false,
+      })),
     })
   } catch (err) {
     return handleApiError(err)
