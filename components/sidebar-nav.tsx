@@ -7,6 +7,7 @@ import {
   Store,
   Layers,
   Handshake,
+  FileText,
   Video,
   MessageSquare,
   BarChart2,
@@ -22,6 +23,7 @@ import { createBrowserSupabase } from "@/lib/supabase-browser"
 
 const creatorNav = [
   { label: "Marketplace", href: "/marketplace", icon: Store },
+  { label: "My Applications", href: "/applications", icon: FileText },
   { label: "Linked Accounts", href: "/linked-accounts", icon: Link2 },
   { label: "Active Deals", href: "/messaging", icon: Handshake },
   { label: "Video Studio", href: "/video-studio", icon: Video },

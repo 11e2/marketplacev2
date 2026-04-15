@@ -1,12 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
-import { Search, Filter, ChevronDown, Zap, Sparkles, TrendingUp } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Search, Zap, Sparkles, TrendingUp, Loader2, AlertCircle } from "lucide-react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { EmptyState, SkeletonCard } from "@/components/empty-state"
 
 const filterPills = ["All", "Clipping", "TikTok", "Reels", "Shorts", "YouTube", "Twitter/X", "Discord", "Newsletter", "Podcast"]
+const PAGE_SIZE = 12
 
 interface Campaign {
   id: string
@@ -17,41 +19,109 @@ interface Campaign {
   channels: string[]
   cpm: number | null
   total_budget: number
+  remaining_budget: number
   brand_asset_url: string | null
   accent_color: string | null
   owner: { name: string | null; avatar_url: string | null } | null
   spotsRemaining: number | null
+  percentBudgetUsed: number
 }
 
-export default function MarketplacePage() {
-  const [activeFilter, setActiveFilter] = useState("All")
-  const [search, setSearch] = useState("")
-  const [campaigns, setCampaigns] = useState<Campaign[] | null>(null)
+function MarketplaceInner() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const urlFilter = searchParams.get("filter") ?? "All"
+  const urlSearch = searchParams.get("q") ?? ""
+
+  const [activeFilter, setActiveFilter] = useState(urlFilter)
+  const [searchInput, setSearchInput] = useState(urlSearch)
+  const [debouncedSearch, setDebouncedSearch] = useState(urlSearch)
+
+  const [items, setItems] = useState<Campaign[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const qs = new URLSearchParams()
-    if (activeFilter === "Clipping") qs.set("type", "CLIPPING")
-    else if (activeFilter !== "All") qs.set("channel", activeFilter)
-    if (search.trim()) qs.set("search", search.trim())
+    const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
-    const ctrl = new AbortController()
-    const t = setTimeout(() => {
-      setCampaigns(null)
-      fetch(`/api/campaigns?${qs}`, { signal: ctrl.signal, cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : { items: [] }))
-        .then((j) => setCampaigns(j.items ?? []))
-        .catch((e) => {
-          if (e.name !== "AbortError") setCampaigns([])
-        })
-    }, 200)
-    return () => {
-      ctrl.abort()
-      clearTimeout(t)
+  useEffect(() => {
+    const sp = new URLSearchParams()
+    if (activeFilter !== "All") sp.set("filter", activeFilter)
+    if (debouncedSearch) sp.set("q", debouncedSearch)
+    const qs = sp.toString()
+    router.replace(qs ? `/marketplace?${qs}` : "/marketplace", { scroll: false })
+  }, [activeFilter, debouncedSearch, router])
+
+  const buildParams = useCallback(
+    (pageNum: number) => {
+      const qs = new URLSearchParams()
+      if (activeFilter === "Clipping") qs.set("type", "CLIPPING")
+      else if (activeFilter !== "All") qs.set("channels", activeFilter)
+      if (debouncedSearch) qs.set("search", debouncedSearch)
+      qs.set("page", String(pageNum))
+      qs.set("pageSize", String(PAGE_SIZE))
+      return qs
+    },
+    [activeFilter, debouncedSearch],
+  )
+
+  const reqIdRef = useRef(0)
+
+  useEffect(() => {
+    const id = ++reqIdRef.current
+    setLoading(true)
+    setError(null)
+    setItems(null)
+    setPage(1)
+
+    fetch(`/api/campaigns?${buildParams(1)}`, { cache: "no-store" })
+      .then(async (r) => {
+        const json = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(json?.error?.message || "Failed to load campaigns")
+        return json
+      })
+      .then((json) => {
+        if (reqIdRef.current !== id) return
+        setItems(json.items ?? [])
+        setTotal(json.pagination?.total ?? (json.items?.length ?? 0))
+        setHasMore(Boolean(json.pagination?.hasMore))
+      })
+      .catch((e) => {
+        if (reqIdRef.current !== id) return
+        setError(e.message || "Failed to load campaigns")
+        setItems([])
+      })
+      .finally(() => {
+        if (reqIdRef.current === id) setLoading(false)
+      })
+  }, [buildParams])
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const next = page + 1
+    try {
+      const r = await fetch(`/api/campaigns?${buildParams(next)}`, { cache: "no-store" })
+      const json = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(json?.error?.message || "Failed to load more")
+      setItems((prev) => [...(prev ?? []), ...(json.items ?? [])])
+      setPage(next)
+      setHasMore(Boolean(json.pagination?.hasMore))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load more")
+    } finally {
+      setLoadingMore(false)
     }
-  }, [activeFilter, search])
+  }
 
-  const isLoading = campaigns === null
-  const items = useMemo(() => campaigns ?? [], [campaigns])
+  const list = useMemo(() => items ?? [], [items])
 
   return (
     <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex">
@@ -65,18 +135,12 @@ export default function MarketplacePage() {
               <input
                 type="text"
                 placeholder="Search campaigns, brands, channels..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                aria-label="Search campaigns"
                 className="w-full bg-[#131825] border border-[#2A3050] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[#E2E8F0] placeholder-[#8892A8] outline-none focus:border-[#6C5CE7] transition-colors"
               />
             </div>
-            <button
-              className="flex items-center gap-2 bg-[#131825] border border-[#2A3050] rounded-xl px-4 py-2.5 text-sm text-[#8892A8] hover:border-[#6C5CE7] transition-colors"
-            >
-              <Filter size={14} />
-              Filters
-              <ChevronDown size={14} />
-            </button>
           </div>
 
           <div className="flex gap-2 mt-3 overflow-x-auto pb-1 scrollbar-none">
@@ -84,6 +148,7 @@ export default function MarketplacePage() {
               <button
                 key={pill}
                 onClick={() => setActiveFilter(pill)}
+                aria-pressed={activeFilter === pill}
                 className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5"
                 style={
                   activeFilter === pill
@@ -103,82 +168,114 @@ export default function MarketplacePage() {
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-[#E2E8F0]">Campaigns</h2>
-                <span className="text-sm text-[#8892A8]">{items.length} available</span>
+                <span className="text-sm text-[#8892A8]">
+                  {loading ? "Loading..." : `${total} available`}
+                </span>
               </div>
 
-              {isLoading ? (
+              {loading ? (
                 <div className="grid md:grid-cols-2 gap-4">
                   <SkeletonCard />
                   <SkeletonCard />
                   <SkeletonCard />
                   <SkeletonCard />
                 </div>
-              ) : items.length === 0 ? (
+              ) : error ? (
+                <EmptyState
+                  icon={AlertCircle}
+                  title="Couldn't load campaigns"
+                  description={error}
+                  action={
+                    <button
+                      onClick={() => setDebouncedSearch((s) => s)}
+                      className="bg-[#6C5CE7] hover:bg-[#5a4dd4] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                    >
+                      Retry
+                    </button>
+                  }
+                />
+              ) : list.length === 0 ? (
                 <EmptyState
                   icon={Sparkles}
-                  title="No campaigns yet"
-                  description="Campaigns will appear here as brands publish them. Check back soon."
+                  title="No campaigns found"
+                  description={
+                    debouncedSearch || activeFilter !== "All"
+                      ? "Try a different search or filter."
+                      : "Campaigns will appear here as brands publish them."
+                  }
                 />
               ) : (
-                <div className="grid md:grid-cols-2 gap-4">
-                  {items.map((c) => (
-                    <Link
-                      key={c.id}
-                      href={`/campaign/${c.id}`}
-                      className="bg-[#131825] border border-[#2A3050] rounded-2xl overflow-hidden hover:border-[#6C5CE7] transition-colors"
-                    >
-                      <div
-                        className="h-1"
-                        style={{ backgroundColor: c.accent_color || "#6C5CE7" }}
-                      />
-                      <div className="p-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {c.owner?.avatar_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={c.owner.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
-                            ) : (
-                              <div className="w-7 h-7 rounded-full bg-[#6C5CE7]/20 text-[#6C5CE7] flex items-center justify-center text-[10px] font-bold">
-                                {(c.owner?.name || "?").charAt(0).toUpperCase()}
-                              </div>
+                <>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {list.map((c) => (
+                      <Link
+                        key={c.id}
+                        href={`/campaign/${c.id}`}
+                        className="bg-[#131825] border border-[#2A3050] rounded-2xl overflow-hidden hover:border-[#6C5CE7] transition-colors"
+                      >
+                        <div className="h-1" style={{ backgroundColor: c.accent_color || "#6C5CE7" }} />
+                        <div className="p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {c.owner?.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={c.owner.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-[#6C5CE7]/20 text-[#6C5CE7] flex items-center justify-center text-[10px] font-bold">
+                                  {(c.owner?.name || "?").charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <span className="text-xs font-semibold text-[#E2E8F0] truncate">
+                                {c.owner?.name || "Brand"}
+                              </span>
+                            </div>
+                            {c.type === "CLIPPING" && c.cpm != null && (
+                              <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-[#00B894]/20 text-[#00B894]">
+                                CPM ${c.cpm}
+                              </span>
                             )}
-                            <span className="text-xs font-semibold text-[#E2E8F0] truncate">
-                              {c.owner?.name || "Brand"}
+                          </div>
+                          <h3 className="font-bold text-[#E2E8F0] mb-1 line-clamp-1">{c.title}</h3>
+                          <p className="text-xs text-[#8892A8] line-clamp-2 mb-3">{c.description}</p>
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {c.channels.slice(0, 4).map((ch) => (
+                              <span
+                                key={ch}
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#6C5CE7]/15 text-[#6C5CE7]"
+                              >
+                                {ch}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between pt-3 border-t border-[#2A3050] text-xs">
+                            <span className="text-[#8892A8]">
+                              Budget:{" "}
+                              <span className="font-mono font-semibold text-[#E2E8F0]">
+                                ${Number(c.total_budget).toLocaleString()}
+                              </span>
+                            </span>
+                            <span className="bg-[#6C5CE7] text-white font-semibold px-3 py-1 rounded-md">
+                              View
                             </span>
                           </div>
-                          {c.type === "CLIPPING" && c.cpm != null && (
-                            <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-[#00B894]/20 text-[#00B894]">
-                              CPM ${c.cpm}
-                            </span>
-                          )}
                         </div>
-                        <h3 className="font-bold text-[#E2E8F0] mb-1 line-clamp-1">{c.title}</h3>
-                        <p className="text-xs text-[#8892A8] line-clamp-2 mb-3">{c.description}</p>
-                        <div className="flex flex-wrap gap-1.5 mb-3">
-                          {c.channels.slice(0, 4).map((ch) => (
-                            <span
-                              key={ch}
-                              className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#6C5CE7]/15 text-[#6C5CE7]"
-                            >
-                              {ch}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between pt-3 border-t border-[#2A3050] text-xs">
-                          <span className="text-[#8892A8]">
-                            Budget:{" "}
-                            <span className="font-mono font-semibold text-[#E2E8F0]">
-                              ${Number(c.total_budget).toLocaleString()}
-                            </span>
-                          </span>
-                          <span className="bg-[#6C5CE7] text-white font-semibold px-3 py-1 rounded-md">
-                            View
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                      </Link>
+                    ))}
+                  </div>
+
+                  {hasMore && (
+                    <div className="flex justify-center mt-6">
+                      <button
+                        onClick={loadMore}
+                        disabled={loadingMore}
+                        className="bg-[#131825] border border-[#2A3050] hover:border-[#6C5CE7] text-sm font-semibold text-[#E2E8F0] px-5 py-2.5 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-60"
+                      >
+                        {loadingMore && <Loader2 size={14} className="animate-spin" />}
+                        {loadingMore ? "Loading..." : "Load more"}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </section>
           </main>
@@ -207,5 +304,19 @@ export default function MarketplacePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function MarketplacePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="dark min-h-screen bg-[#0B0F1A] text-[#E2E8F0] flex items-center justify-center">
+          <Loader2 size={20} className="animate-spin text-[#6C5CE7]" />
+        </div>
+      }
+    >
+      <MarketplaceInner />
+    </Suspense>
   )
 }
