@@ -141,3 +141,8 @@ export const reviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   text: z.string().max(2000).optional(),
 })
+
+export const submissionReviewSchema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  notes: z.string().max(2000).optional(),
+})

@@ -14,12 +14,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const { data: deal } = await supabase
       .from("deals")
-      .select("brand_user_id, creator_user_id")
+      .select("brand_user_id, creator_user_id, status")
       .eq("id", id)
       .maybeSingle()
     if (!deal) throw new ApiError("NOT_FOUND", "Deal not found")
     if (deal.brand_user_id !== user.id && deal.creator_user_id !== user.id) {
       throw new ApiError("FORBIDDEN", "Not a deal participant")
+    }
+    if (deal.status !== "NEGOTIATING") {
+      throw new ApiError("BAD_REQUEST", `Cannot counter proposals while deal is ${deal.status}`)
     }
 
     const { data: original } = await supabase

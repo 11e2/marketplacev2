@@ -13,12 +13,15 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
     const { data: deal } = await supabase
       .from("deals")
-      .select("brand_user_id, creator_user_id")
+      .select("brand_user_id, creator_user_id, status")
       .eq("id", id)
       .maybeSingle()
     if (!deal) throw new ApiError("NOT_FOUND", "Deal not found")
     if (deal.brand_user_id !== user.id && deal.creator_user_id !== user.id) {
       throw new ApiError("FORBIDDEN", "Not a deal participant")
+    }
+    if (deal.status !== "NEGOTIATING") {
+      throw new ApiError("BAD_REQUEST", `Cannot accept proposals while deal is ${deal.status}`)
     }
 
     const { data: proposal } = await supabase
@@ -33,6 +36,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       throw new ApiError("FORBIDDEN", "Cannot accept your own proposal")
     }
 
+    // Accepts proposal then updates the deal in two separate writes. If the
+    // second write fails the proposal is left ACCEPTED while the deal is still
+    // NEGOTIATING; repeat calls idempotently re-apply the deal update because
+    // the proposal is looked up by pid.
+    // TODO(atomicity): wrap both updates in a SECURITY DEFINER RPC.
     const svc = createServiceSupabase()
     const { error: pErr } = await svc
       .from("deal_proposals")
